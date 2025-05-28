@@ -1,0 +1,8 @@
+*_train/
+webscrape/data/
+cnn/
+yolo/
+
+images/
+node_modules/
+runs/
