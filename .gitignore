@@ -1,6 +1,7 @@
 *_train/
 webscrape/data/
-cnn/
+dataset/cnn/train/
+dataset/cnn/val/
 yolo/
 
 images/

@@ -15,7 +15,7 @@ OUTPUT_LABEL_DIR       = 'dataset/yolo/labels/train'   # output YOLO labels
 OUTPUT_IMG_DIR_VAL     = 'dataset/yolo/images/val'     # output validation images
 OUTPUT_LABEL_DIR_VAL   = 'dataset/yolo/labels/val'     # output validation labels
 
-NUM_SAMPLES            = 5000                     # number of synthetic images to generate
+NUM_SAMPLES            = 10000                     # number of synthetic images to generate
 BACKGROUND_ONLY_PROPORTION = 0.20                 # proportion of images that should have no cards present
 CARDS_PER_IMAGE        = (1, 25)                  # min, max number of cards per synthetic image
 
@@ -23,7 +23,7 @@ CARDS_PER_IMAGE        = (1, 25)                  # min, max number of cards per
 CLASS_FULLART          = 0
 CLASS_STANDARD         = 1
 
-SIZE_REL_RANGE         = (0.2, 0.8)              # relative size range of card vs template
+SIZE_REL_RANGE         = (0.1, 0.8)              # relative size range of card vs template
 TARGET_SIZE            = (640, 640)              # target input resolution for YOLO (width, height)
 PAD_COLOR              = (114, 114, 114)         # letterbox padding color (YOLO default gray)
 
