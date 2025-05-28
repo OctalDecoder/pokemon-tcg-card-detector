@@ -2,6 +2,7 @@ import os
 import time
 import logging
 import glob
+import json
 import math
 import numpy as np
 from functools import lru_cache
@@ -88,12 +89,27 @@ def run():
             cid = os.path.splitext(os.path.basename(p))[0]
             ref_map[cid] = p
 
-    detector = YOLO(YOLO_MODEL)
+    # Prepare screenshots to process
     shots = sorted(sum([glob.glob(os.path.join(SCREENSHOT_DIR, f'*.{ext}')) for ext in ('png','jpg')], []))
+            
+    # Initialise YOLO and CNN detectors, pay the startup cost by performing dummy actions
+    detector = YOLO(YOLO_MODEL)
+    _ = detector.predict(np.zeros((640, 640, 3), dtype=np.uint8), conf=CONF_THRESHOLD, verbose=False)
+    
+    dummy_input = torch.zeros((1, 3, 224, 224)).to(device)
+    with torch.no_grad():
+        _ = cnn(dummy_input)
 
+    # Begin detection
+    detections = {}
+    all0 = time.time()
     for sp in shots:
+        bp = os.path.basename(sp)
+        tt0 = time.time()
+        it0 = time.time()
         orig = Image.open(sp).convert('RGB')
         arr = np.array(orig)
+        image_load_time = time.time() - it0
 
         # Detection
         dt0 = time.time()
@@ -131,6 +147,7 @@ def run():
             with torch.no_grad():
                 logits = cnn(inputs)
             preds = logits.argmax(1).cpu().tolist()
+            output = [p for p in preds]
             matches = [ref_map.get(classes[p]) for p in preds]
 
             # Logging CNN classification results
@@ -141,12 +158,16 @@ def run():
                     logger.debug(f"CNN result - crop {idx}: predicted '{class_id}', matched path: {match_path}")
         else:
             matches = []
+        
+        detections[bp] = output
         class_time = time.time() - ct0
 
-        logger.info(f"{os.path.basename(sp)} det:{det_time:.3f}s cls:{class_time:.3f}s")
+        tot = time.time() - tt0
+        logger.info(f"{bp:.25s} img:{image_load_time:.3f}s det:{det_time:.3f}s cls:{class_time:.3f}s | total time:{tot:.3f}s")
 
         # Composite
         if matches and SAVE_RESULT_IMAGES:
+            sv0 = time.time()
             n = len(matches)
             cols = min(GRID_COLS, n)
             rows = math.ceil(n / cols)
@@ -173,9 +194,19 @@ def run():
             combined.paste(left, (0, 0))
             combined.paste(right, (left_w + MIDDLE_SPACE, 0))
 
-            out_path = os.path.join(OUTPUT_DIR, os.path.basename(sp))
+            out_path = os.path.join(OUTPUT_DIR, bp)
             combined.save(out_path)
+            svt = time.time() - sv0
+            logger.info(f"{bp:.25s} | Saved result in {svt:.3f}s")
+            
+    allt = time.time() - all0
+    logger.info(f"Detection completed in {allt:.3f}s")
+    return detections
 
 if __name__ == '__main__':
+    full0 = time.time()
     logger.info("Starting pipeline with batch classification...")
-    run()
+    results = run()
+    fullt = time.time() - full0
+    logger.info(json.dumps(results).replace("],", "],\n").replace("{", "\n ").replace("}", ""))
+    logger.info(f"Full pipeline completed in {fullt:.3f}s")
