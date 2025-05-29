@@ -14,8 +14,8 @@ SOURCE_DIR   = os.path.join(BASE_DIR, 'images', 'cards')
 TRAIN_DIR    = os.path.join(BASE_DIR, 'dataset', 'cnn', 'train')
 VAL_DIR      = os.path.join(BASE_DIR, 'dataset', 'cnn', 'val')
 VAL_SPLIT    = 0.2
-VARIANTS_PER = 120
-RANDOM_SEED  = 132
+VARIANTS_PER = 150
+RANDOM_SEED  = 88
 ALLOWED_EXT  = ('.png', '.jpg', '.jpeg', '.bmp')
 
 # ─── COMPONENT OVERLAY CONFIG ───────────────────────────────────────────────────
@@ -40,7 +40,7 @@ augmentor = A.Compose([
         A.RandomResizedCrop(size=(224,224), scale=(0.5,1.0), ratio=(0.8,1.2)),
     ], p=1.0),
     A.Affine(
-        translate_percent={"x":(-0.20,0.20), "y":(-0.80,0.80)},
+        translate_percent={"x":(-0.10,0.10), "y":(-0.90,0.90)},
         p=0.25
     ),
     A.Affine(rotate=(-5,5), shear=(-2,2), p=0.8),

@@ -12,6 +12,7 @@ Workflow
 Run:
     python cnn_master_and_distill.py --epochs-master 10 --epochs-student 6
 Add `--student-only` once the master checkpoint exists to skip re-training it.
+Add `--resume-master` to load and continue training from an existing master.
 """
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -45,17 +46,16 @@ NUM_WORKERS   = max(2, os.cpu_count() // 2)
 IMG_SIZE      = 224
 
 # ----------------- Paths -----------------------------------------------------
-BASE_DIR    = Path(__file__).resolve().parent
-DATA_ROOT   = BASE_DIR / "dataset" / "cnn"
-TRAIN_DIR   = DATA_ROOT / "train"
-VAL_DIR     = DATA_ROOT / "val"
-MASTER_CKPT = DATA_ROOT / "cnn_master_best.pth"
+BASE_DIR     = Path(__file__).resolve().parent
+DATA_ROOT    = BASE_DIR / "dataset" / "cnn"
+TRAIN_DIR    = DATA_ROOT / "train"
+VAL_DIR      = DATA_ROOT / "val"
+MASTER_CKPT   = DATA_ROOT / "cnn_master_best.pth"
 RAW_IMG_ROOT = BASE_DIR / "images" / "cards"
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Helper utilities
 # ──────────────────────────────────────────────────────────────────────────────
-
 class FlatDataset(Dataset):
     """
     Walk a list of `parent_dirs`, each of which contains
@@ -69,7 +69,6 @@ class FlatDataset(Dataset):
         idx = 0
 
         for parent in parent_dirs:
-            # e.g. parent = dataset/cnn/train/fullart
             for class_dir in sorted(parent.iterdir()):
                 if not class_dir.is_dir():
                     continue
@@ -80,7 +79,6 @@ class FlatDataset(Dataset):
                 label = self.class_to_idx[cname]
 
                 for img_path in class_dir.glob("*"):
-                    # you may wish to filter by suffix: .jpg/.png etc
                     self.samples.append((str(img_path), label))
 
     def __len__(self):
@@ -93,9 +91,10 @@ class FlatDataset(Dataset):
             img = self.transform(img)
         return img, label
 
+
 def build_flat_loaders(train_parents: List[Path],
                        val_parents:   List[Path]
-                      ) -> Tuple[DataLoader, DataLoader, int, dict[str, int], List[Tuple[str, int]]]:
+                      ) -> Tuple[DataLoader, DataLoader, int, dict, List[Tuple[str,int]]]:
     tr_ds = FlatDataset(train_parents, transform=make_transforms(True))
     va_ds = FlatDataset(val_parents,   transform=make_transforms(False))
 
@@ -106,13 +105,14 @@ def build_flat_loaders(train_parents: List[Path],
 
     n_classes = len(tr_ds.class_to_idx)
     class_to_idx = tr_ds.class_to_idx
-    samples      = tr_ds.samples   # list of (path, label)
+    samples      = tr_ds.samples
 
     return train_ld, val_ld, n_classes, class_to_idx, samples
 
+
 def list_subcategories(root: Path) -> List[str]:
-    """Return sorted list of immediate subfolder names inside *root*."""
     return sorted([d.name for d in root.iterdir() if d.is_dir()])
+
 
 def make_transforms(train: bool) -> transforms.Compose:
     if train:
@@ -129,6 +129,7 @@ def make_transforms(train: bool) -> transforms.Compose:
         transforms.Normalize([.485,.456,.406], [.229,.224,.225]),
     ])
 
+
 def build_loaders(train_path: Path, val_path: Path) -> Tuple[DataLoader, DataLoader, int]:
     train_ds = tv.datasets.ImageFolder(str(train_path), transform=make_transforms(True))
     val_ds   = tv.datasets.ImageFolder(str(val_path),   transform=make_transforms(False))
@@ -137,6 +138,7 @@ def build_loaders(train_path: Path, val_path: Path) -> Tuple[DataLoader, DataLoa
     val_ld   = DataLoader(val_ds,   batch_size=BATCH_SIZE, shuffle=False,
                           num_workers=NUM_WORKERS, pin_memory=True)
     return train_ld, val_ld, len(train_ds.classes)
+
 
 def accuracy_top1(logits: torch.Tensor, target: torch.Tensor) -> float:
     with torch.no_grad():
@@ -159,6 +161,7 @@ class DistillationLoss(nn.Module):
             nn.functional.softmax(t_logit/self.T, dim=1)
         ) * self.T**2
         return self.alpha*ce + (1-self.alpha)*kd
+
 
 def run_epoch(model, loader, crit, opt=None, distill=False, teacher=None, device="cpu"):
     train = opt is not None
@@ -186,52 +189,52 @@ def run_epoch(model, loader, crit, opt=None, distill=False, teacher=None, device
 # Master training
 # ──────────────────────────────────────────────────────────────────────────────
 
-def train_master(epochs:int, device:str):
+def train_master(epochs:int, device:str, resume_master:bool=False):
     # student-category roots:
     master_train_roots = [TRAIN_DIR / cat for cat in list_subcategories(TRAIN_DIR)]
     master_val_roots   = [VAL_DIR   / cat for cat in list_subcategories(VAL_DIR)]
 
-    train_loader, val_loader, nc, class_to_idx, samples = build_flat_loaders(master_train_roots, master_val_roots)
+    train_loader, val_loader, nc, class_to_idx, samples = \
+        build_flat_loaders(master_train_roots, master_val_roots)
     
-    # Generate mappings
+    # Save mappings
     idx_to_card = { idx: name for name, idx in class_to_idx.items() }
     idx_to_image = {}
     for card_name, idx in class_to_idx.items():
-        # look in each subfolder (fullart, standard, ...)
         for parent in master_train_roots:
-            raw_dir = RAW_IMG_ROOT / parent.name
-            matches = list(raw_dir.glob(f"{card_name}.*"))
+            matches = list((RAW_IMG_ROOT/parent.name).glob(f"{card_name}.*"))
             if matches:
                 idx_to_image[idx] = str(matches[0])
                 break
         else:
             idx_to_image[idx] = None
+    with open(DATA_ROOT/"master_mappings.json","w") as f:
+        json.dump({"idx_to_card":idx_to_card,"idx_to_image":idx_to_image},f,indent=2)
 
-    mapping = {"idx_to_card": idx_to_card,
-               "idx_to_image": idx_to_image}
-    
-    with open(DATA_ROOT / "master_mappings.json", "w") as f:
-        json.dump(mapping, f, indent=2)
-
-    # Training Init
+    # Model init
     model = efficientnet_b0(weights=EfficientNet_B0_Weights.DEFAULT)
     in_f = model.classifier[1].in_features
     model.classifier = nn.Sequential(nn.Dropout(0.2), nn.Linear(in_f, nc))
     model.to(device)
 
+    # optionally load existing checkpoint
+    if resume_master and MASTER_CKPT.exists():
+        ckpt = torch.load(MASTER_CKPT, map_location=device, weights_only=True)
+        model.load_state_dict(ckpt)
+        print(f"Loaded existing master checkpoint: {MASTER_CKPT}")
+
     opt = optim.AdamW(model.parameters(), lr=LR_MASTER, weight_decay=WEIGHT_DECAY)
     sch = optim.lr_scheduler.StepLR(opt, epochs//2, gamma=0.1)
     crit = nn.CrossEntropyLoss()
-    best = 0.0
+    best=0.0
 
-    # Train
-    for ep in range(1, epochs+1):
+    for ep in range(1,epochs+1):
         tl, ta = run_epoch(model, train_loader, crit, opt, device=device)
         vl, va_acc = run_epoch(model, val_loader, crit, device=device)
         sch.step()
         print(f"[Master {ep}/{epochs}] train {ta:.3f} | val {va_acc:.3f}")
-        if va_acc > best:
-            best = va_acc
+        if va_acc>best:
+            best=va_acc
             torch.save(model.state_dict(), MASTER_CKPT)
             print("  ↳ new best saved")
 
@@ -242,82 +245,71 @@ def train_master(epochs:int, device:str):
 def distil_student(cat:str, teacher_ckpt:Path, epochs:int, device:str):
     tr_p, va_p = TRAIN_DIR/cat, VAL_DIR/cat
     train_loader, val_loader, nc = build_loaders(tr_p, va_p)
-    
-    # Generate Mappings
+    # mappings
     train_ds = train_loader.dataset
-    idx_to_card = { idx: cls
-                    for cls, idx in train_ds.class_to_idx.items() }
-    raw_dir = RAW_IMG_ROOT / cat
-    idx_to_image = {}
-    for cls, idx in train_ds.class_to_idx.items():
-        matches = list(raw_dir.glob(f"{cls}.*"))
-        idx_to_image[idx] = str(matches[0]) if matches else None
+    idx_to_card = {idx:cls for cls,idx in train_ds.class_to_idx.items()}
+    raw_dir=RAW_IMG_ROOT/cat
+    idx_to_image={idx:str(next(raw_dir.glob(f"{cls}.*"),None))
+                  for cls,idx in train_ds.class_to_idx.items()}
+    with open(DATA_ROOT/f"{cat}_mappings.json","w") as f:
+        json.dump({"idx_to_card":idx_to_card,"idx_to_image":idx_to_image},f,indent=2)
 
-    mapping = {"idx_to_card":  idx_to_card,
-               "idx_to_image": idx_to_image}
-
-    out_fn = DATA_ROOT / f"{cat}_mappings.json"
-    with open(out_fn, "w") as f:
-        json.dump(mapping, f, indent=2)
-
-    # ----- Teacher -----
-    teacher = efficientnet_b0()
-    in_ft = teacher.classifier[1].in_features
-    teacher.classifier[1] = nn.Linear(in_ft, nc)
-
-    # load only the backbone weights, drop the old 1098-way head
-    ckpt = torch.load(teacher_ckpt, map_location=device)
-    for key in ["classifier.1.weight", "classifier.1.bias"]:
-        ckpt.pop(key, None)
-
-    missing, unexpected = teacher.load_state_dict(ckpt, strict=False)
-    if missing or unexpected:
-        print(f"    ↳ dropped head params, loaded {len(ckpt)} backbone keys")
-
+    # teacher
+    teacher=efficientnet_b0()
+    in_ft=teacher.classifier[1].in_features
+    teacher.classifier[1]=nn.Linear(in_ft,nc)
+    ckpt=torch.load(teacher_ckpt,map_location=device)
+    for key in ["classifier.1.weight","classifier.1.bias"]: ckpt.pop(key,None)
+    teacher.load_state_dict(ckpt,strict=False)
     teacher.eval().to(device)
 
-    # ----- Student -----
-    student = mobilenet_v3_small(weights=MobileNet_V3_Small_Weights.IMAGENET1K_V1)
-    in_fs = student.classifier[3].in_features
-    student.classifier[3] = nn.Linear(in_fs, nc)
+    # student
+    student=mobilenet_v3_small(weights=MobileNet_V3_Small_Weights.IMAGENET1K_V1)
+    in_fs=student.classifier[3].in_features
+    student.classifier[3]=nn.Linear(in_fs,nc)
     student.to(device)
 
-    crit = DistillationLoss(ALPHA_CE, T_KD)
-    opt  = optim.AdamW(student.parameters(), lr=LR_STUDENT, weight_decay=WEIGHT_DECAY)
-    sch  = optim.lr_scheduler.CosineAnnealingLR(opt, T_max=epochs)
+    crit=DistillationLoss(ALPHA_CE,T_KD)
+    opt=optim.AdamW(student.parameters(),lr=LR_STUDENT,weight_decay=WEIGHT_DECAY)
+    sch=optim.lr_scheduler.CosineAnnealingLR(opt,T_max=epochs)
 
-    best=0.; out_ckpt = DATA_ROOT/f"cnn_{cat}_student.pth"
+    best=0.; out_ckpt=DATA_ROOT/f"cnn_{cat}_student.pth"
     for ep in range(1,epochs+1):
-        train_loss, train_acc = run_epoch(student, train_loader, crit, opt, True, teacher, device)
-        val_loss,   val_acc   = run_epoch(student, val_loader, crit, None,  True, teacher, device)
+        tr_l,tr_a=run_epoch(student,train_loader,crit,opt,True,teacher,device)
+        vl,va=run_epoch(student,val_loader,crit,None,True,teacher,device)
         sch.step()
-        print(f"  [Student-{cat} {ep}/{epochs}] "
-                f"train {train_acc:.3f} | val {val_acc:.3f}")
-        if val_acc > best:
-            best = val_acc
-            torch.save(student.state_dict(), out_ckpt)
+        print(f"  [Student-{cat} {ep}/{epochs}] train {tr_a:.3f} | val {va:.3f}")
+        if va>best:
+            best=va; torch.save(student.state_dict(),out_ckpt)
             print("    ↳ best saved")
     print(f"Finished '{cat}' - best val {best:.3f}")
 
 # ──────────────────────────────────────────────────────────────────────────────
 # CLI & main
 # ──────────────────────────────────────────────────────────────────────────────
-
-def parse():
-    p=argparse.ArgumentParser()
+def parse_args():
+    p = argparse.ArgumentParser()
     p.add_argument("--epochs-master", type=int, default=10)
     p.add_argument("--epochs-student", type=int, default=6)
     p.add_argument("--student-only", action="store_true")
+    p.add_argument("--resume-master", action="store_true",
+                   help="Load and continue training from existing master checkpoint")
     return p.parse_args()
 
-if __name__=="__main__":
-    args=parse(); dev="cuda" if torch.cuda.is_available() else "cpu"
+if __name__ == "__main__":
+    args = parse_args()
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
     if not args.student_only:
-        print("Training master …"); train_master(args.epochs_master, dev)
+        print("Training master ...")
+        train_master(args.epochs_master, device, args.resume_master)
     else:
-        assert MASTER_CKPT.exists(), "Master checkpoint missing. Run without --student-only first."
+        assert MASTER_CKPT.exists(), \
+               "Master checkpoint missing. Run without --student-only first."
+
     cats = list_subcategories(TRAIN_DIR)
     print("Sub-categories detected:", ", ".join(cats))
     for c in cats:
-        print(f"\nDistilling {c} …"); distil_student(c, MASTER_CKPT, args.epochs_student, dev)
+        print(f"\nDistilling {c} ...")
+        distil_student(c, MASTER_CKPT, args.epochs_student, device)
     print("\nAll students distilled ✔")

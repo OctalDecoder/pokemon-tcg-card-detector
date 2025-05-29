@@ -7,7 +7,7 @@ current = os.path.dirname(os.path.realpath(__file__))
 parent = os.path.dirname(current)
 sys.path.append(parent)
 
-from prototype_cnn import detect
+from prototype import detect
 
 # define your expected outputs
 EXPECTED = {
@@ -76,7 +76,11 @@ EXPECTED = {
     "Screenshot_20250528_172719_Pokmon_TCGP.jpg": ["A2 43"],
     "Screenshot_20250528_172752_Pokmon_TCGP.jpg": ["A2 80"],
     "Screenshot_20250528_172755_Pokmon_TCGP.jpg": ["A2 94"],
-    "Screenshot_20250528_172757_Pokmon_TCGP.jpg": ["A2 16"]
+    "Screenshot_20250528_172757_Pokmon_TCGP.jpg": ["A2 16"],
+    "Screenshot_20250528_235114_Pokmon_TCGP.jpg": ["A2b 55", "A2b 52", "A2b 66", "P-A 65", "A3 144", "A3 189", "A3 144", "P-A 1"],
+    "Screenshot_20250528_235428_Pokmon_TCGP.jpg": ["A3 189"],
+    "Screenshot_20250528_235450_Pokmon_TCGP.jpg": ["A3 189"],
+    "Screenshot_20250528_235453_Pokmon_TCGP.jpg": ["A2b 67"]
 }
 
 IMAGES_DIR = os.path.join(os.path.dirname(__file__), "images")
@@ -201,7 +205,7 @@ def tune(cnn_range, yolo_range):
 if __name__ == "__main__":
     if "--tune" in sys.argv:
         cnn_vals = [i/100 for i in range(5, 95, 5)]
-        yolo_vals = [i/100 for i in range(5, 85, 10)]
+        yolo_vals = [i/100 for i in range(5, 95, 5)]
         tune(cnn_vals, yolo_vals)
     else:
         run_default()

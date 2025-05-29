@@ -1,0 +1,11 @@
+# Paths to your image folders (with matching .txt labels)
+train: images/train
+val: images/val
+
+# Number of classes
+nc: 2
+
+# Class names, in order of their class IDs
+names:
+  0: fullart
+  1: standard

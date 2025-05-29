@@ -11,16 +11,14 @@ CARDS_STANDARD_DIR       = 'images/cards/standard'
 TEMPLATES_DIR            = 'images/screenshots/backgrounds'
 
 OUTPUT_IMG_DIR           = 'dataset/yolo/images/train'
-OUTPUT_LABEL_DIR         = 'dataset/yolo/labels/train'
 OUTPUT_IMG_DIR_VAL       = 'dataset/yolo/images/val'
+OUTPUT_LABEL_DIR         = 'dataset/yolo/labels/train'
 OUTPUT_LABEL_DIR_VAL     = 'dataset/yolo/labels/val'
 
 COMPONENTS_DIR           = 'images/screenshots/backgrounds/components'
 COMPONENT_OVERLAY_PROB   = 0.2            # 20% of cards get a snippet
 COMPONENT_SCALE_RANGE    = (0.5, 0.9)     # snippet size relative to card width
 COMPONENT_AMOUNT         = 1              # how many snippets per decorated card
-
-CROP_SCREEN_PROB         = 0.1            # 10% of cards may be partially off‐screen
 
 NUM_SAMPLES              = 10000
 BACKGROUND_ONLY_PROPORTION = 0.20
@@ -32,6 +30,10 @@ CLASS_STANDARD           = 1
 SIZE_REL_RANGE           = (0.1, 0.8)
 TARGET_SIZE              = (640, 640)
 PAD_COLOR                = (114, 114, 114)
+
+OFFSCREEN_CHANCE = 0.35
+OFFSCREEN_MAX = 0.90
+OFFSCREEN_MIN = 0.10
 
 
 # ─── PRELOAD FILE LISTS ────────────────────────────────────────────────────────
@@ -89,34 +91,62 @@ def generate_sample(sample_idx):
             w, h = card.size
 
             # scale card
-            scale = min(random.uniform(*SIZE_REL_RANGE) * orig_w / w,
-                        random.uniform(*SIZE_REL_RANGE) * orig_h / h)
+            scale = min(
+                random.uniform(*SIZE_REL_RANGE) * orig_w / w,
+                random.uniform(*SIZE_REL_RANGE) * orig_h / h
+            )
             new_w, new_h = int(w * scale), int(h * scale)
             card_resized = card.resize((new_w, new_h), Image.LANCZOS)
 
             # try placements
             for _ in range(10):
-                # allow partial off-screen on Y 10% of time
-                x1 = random.randint(0, orig_w - new_w)
-                if random.random() < CROP_SCREEN_PROB:
-                    y1 = random.randint(-new_h//2, orig_h - new_h//2)
+                # decide off-screen placement (35% chance)
+                if random.random() < 0.35:
+                    # x always fully on screen
+                    x1 = random.randint(0, orig_w - new_w)
+                    # top or bottom?
+                    if random.random() < 0.5:
+                        # off-screen at top between 10%-90%
+                        y1 = random.randint(
+                            -int(new_h * 0.90),
+                            -int(new_h * 0.10)
+                        )
+                    else:
+                        # off-screen at bottom between 10%-90%
+                        y1 = random.randint(
+                            orig_h - new_h + int(new_h * 0.10),
+                            orig_h - new_h + int(new_h * 0.90)
+                        )
                 else:
+                    # fully on-screen placement
+                    x1 = random.randint(0, orig_w - new_w)
                     y1 = random.randint(0, orig_h - new_h)
-                x2, y2 = x1 + new_w, y1 + new_h
-                box = (x1, y1, x2, y2)
 
-                if all(not boxes_overlap(box, ann[:4]) for ann in annotations):
-                    # paste card
-                    annotations.append((x1, y1, x2, y2, cls))
+                x2, y2 = x1 + new_w, y1 + new_h
+
+                # clamp to visible box
+                vis_x1 = max(0, x1)
+                vis_y1 = max(0, y1)
+                vis_x2 = min(orig_w, x2)
+                vis_y2 = min(orig_h, y2)
+
+                # ensure theres still something visible
+                if vis_x2 > vis_x1 and vis_y2 > vis_y1 and \
+                all(not boxes_overlap((vis_x1, vis_y1, vis_x2, vis_y2), ann[:4])
+                    for ann in annotations):
+
+                    # record only the visible portion
+                    annotations.append((vis_x1, vis_y1, vis_x2, vis_y2, cls))
+
+                    # paste the full card (so off-screen parts remain hidden)
                     tmpl_orig.paste(card_resized, (x1, y1), card_resized)
 
-                    # optional UI snippet
+                    # optional UI snippet overlay
                     if random.random() < COMPONENT_OVERLAY_PROB:
                         for __ in range(COMPONENT_AMOUNT):
                             comp_path = random.choice(component_paths)
                             comp = Image.open(comp_path).convert('RGBA')
                             cw, ch = comp.size
-
                             comp_scale = random.uniform(*COMPONENT_SCALE_RANGE) * new_w / cw
                             comp_w, comp_h = int(cw * comp_scale), int(ch * comp_scale)
                             comp_resized = comp.resize((comp_w, comp_h), Image.LANCZOS)
