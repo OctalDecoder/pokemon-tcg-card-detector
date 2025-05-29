@@ -1,17 +1,6 @@
-*_train/
-webscrape/data/
-dataset/cnn/train/
-dataset/cnn/val/
-dataset/cnn/v*/
-dataset/yolo/images/
-dataset/yolo/labels/
-__pycache__/
-.pytest_cache/
-
-images/
-results/
-node_modules/
-runs/
+data/
+output/
+card_detector.egg-info/
+tests/fixtures
 
 *.pyc
-yolo*.pt

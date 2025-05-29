@@ -1,6 +1,6 @@
-# Paths to your image folders (with matching .txt labels)
-train: images/train
-val: images/val
+# Paths to image/label folders
+train: data/yolo/images/train
+val: data/yolo/images/val
 
 # Number of classes
 nc: 2

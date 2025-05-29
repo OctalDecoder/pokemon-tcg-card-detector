@@ -7,7 +7,7 @@ current = os.path.dirname(os.path.realpath(__file__))
 parent = os.path.dirname(current)
 sys.path.append(parent)
 
-from prototype import detect
+from proto.prototype import detect
 
 # define your expected outputs
 EXPECTED = {

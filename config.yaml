@@ -1,0 +1,33 @@
+# config.yaml
+yolo:
+  data_config: "config/yolo.yaml"
+  model_name: "tcgp_card_detector"
+
+  # Hyper-parameters
+  batch_size: 16
+  epochs: 25
+  img_size: 640
+  device: 0
+  lr0: 0.001
+  lr_final_factor: 0.01
+  patience: 5
+
+cnn:
+  # Paths
+  data_root: "data/cnn"
+  train_dir: "data/cnn/train"
+  val_dir: "data/cnn/val"
+  master_ckpt: "output/cnn_master_best.pth"
+  raw_img_root: "data/raw/cards"
+
+  # Hyper-parameters
+  batch_size: 32
+  weight_decay: 0.02
+  lr_master: 0.0003
+  lr_student: 0.0002
+  t_kd: 4.0
+  alpha_ce: 0.2
+  img_size: 224
+
+prototype:
+  screenshot_dir:

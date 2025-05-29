@@ -22,17 +22,17 @@ from ultralytics import YOLO
 DEBUG              = False
 USE_MASTER_CNN     = False
 SAVE_RESULT_IMAGES = True
-SCREENSHOT_DIR     = 'tests/images'
-OUTPUT_DIR         = 'tests/results'
+SCREENSHOT_DIR     = 'tests/fixtures'
+OUTPUT_DIR         = 'output/tests'
 GRID_COLS          = 5
 MIDDLE_SPACE       = 20
 FONT_PATH          = None
 
-YOLO_MODEL         = 'dataset/yolo/card_detector.pt'
+YOLO_MODEL         = 'models/card_detector.pt'
 YOLO_CONF_THRESHOLD     = 0.1
 BBOX_IOU_THRESH = 0.3 # Bounding box overlap threshold for merging bbox detections
 
-CNN_BASE_DIR = 'dataset/cnn' # /v3 - vertical scrolling'
+CNN_BASE_DIR = 'models/' # /v3 - vertical scrolling'
 CNN_CONF_THRESHOLD  = 0.15
 CNN_SUBCATS = ["fullart", "standard"]
 

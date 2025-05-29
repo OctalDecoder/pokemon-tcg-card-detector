@@ -35,23 +35,26 @@ from torchvision.models import (
     mobilenet_v3_small, MobileNet_V3_Small_Weights,
 )
 
+from ..config import cfg
+
 # ----------------- Hyper-parameters (CLI-override) ---------------------------
-BATCH_SIZE    = 32
-WEIGHT_DECAY  = 1e-2
-LR_MASTER     = 3e-4
-LR_STUDENT    = 2e-4
-T_KD          = 4.0   # temperature for distillation
-ALPHA_CE      = 0.2   # weight for CE vs KD loss
+CONFIG = cfg["cnn"]
+
+BATCH_SIZE    = CONFIG["batch_size"]
+WEIGHT_DECAY  = CONFIG["weight_decay"]
+LR_MASTER     = CONFIG["lr_master"]
+LR_STUDENT    = CONFIG["lr_student"]
+T_KD          = CONFIG["t_kd"]   # temperature for distillation
+ALPHA_CE      = CONFIG["alpha_ce"]   # weight for CE vs KD loss
 NUM_WORKERS   = max(2, os.cpu_count() // 2)
-IMG_SIZE      = 224
+IMG_SIZE      = CONFIG["img_size"]
 
 # ----------------- Paths -----------------------------------------------------
-BASE_DIR     = Path(__file__).resolve().parent
-DATA_ROOT    = BASE_DIR / "dataset" / "cnn"
-TRAIN_DIR    = DATA_ROOT / "train"
-VAL_DIR      = DATA_ROOT / "val"
-MASTER_CKPT   = DATA_ROOT / "cnn_master_best.pth"
-RAW_IMG_ROOT = BASE_DIR / "images" / "cards"
+DATA_ROOT     = CONFIG["data_root"]
+TRAIN_DIR     = CONFIG["train_dir"]
+VAL_DIR       = CONFIG["val_dir"]
+MASTER_CKPT   = CONFIG["master_ckpt"]
+RAW_IMG_ROOT  = CONFIG["raw_img_root"]
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Helper utilities
