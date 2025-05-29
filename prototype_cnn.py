@@ -22,16 +22,19 @@ from ultralytics import YOLO
 DEBUG              = False
 USE_MASTER_CNN     = False
 SAVE_RESULT_IMAGES = True
-SCREENSHOT_DIR     = 'images/screenshots/test suite 2'
+SCREENSHOT_DIR     = 'tests/images'
 OUTPUT_DIR         = 'images/results'
 GRID_COLS          = 5
 MIDDLE_SPACE       = 20
 FONT_PATH          = None
 
-YOLO_MODEL         = 'dataset/best.pt'
-YOLO_CONF_THRESHOLD     = 0.40
-CNN_TRAIN_DATA     = 'dataset/cnn/train'
+YOLO_MODEL         = 'dataset/card_detector.pt'
+YOLO_CONF_THRESHOLD     = 0.15
+BBOX_IOU_THRESH = 0.3 # Bounding box overlap threshold for merging bbox detections
+
+CNN_BASE_DIR = 'dataset/cnn' # /v2'
 CNN_CONF_THRESHOLD  = 0.10
+CNN_SUBCATS = ["fullart", "standard"]
 
 # ─── LOGGING SETUP ──────────────────────────────────────────────────────────────
 logging.basicConfig(format='%(asctime)s [%(levelname)s] %(message)s',
@@ -44,16 +47,14 @@ logger.info("Loading detection & classification pipeline...")
 # ─── CNN INITIALISATION ────────────────────────────────────────────────────────
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-# define which sub-categories you have
-SUBCATS = ["fullart", "standard"]
 
 # load child networks + json mappings
 child_models = {}
 child_maps   = {}
 
-for cat in SUBCATS:
+for cat in CNN_SUBCATS:
     # --- 1a) load the mapping file for this child ---
-    with open(f"dataset/cnn/{cat}_mappings.json") as f:
+    with open(f"{CNN_BASE_DIR}/{cat}_mappings.json") as f:
         raw = json.load(f)
     idx2card  = {int(k):v for k,v in raw["idx_to_card"].items()}
     idx2image = {int(k):v for k,v in raw["idx_to_image"].items()}
@@ -65,14 +66,14 @@ for cat in SUBCATS:
     model.classifier[3] = nn.Linear(in_f, len(idx2card))
 
     # --- 1c) load the weights and eval() ---
-    ckpt = torch.load(f"dataset/cnn/cnn_{cat}_student.pth", map_location=device)
+    ckpt = torch.load(f"{CNN_BASE_DIR}/cnn_{cat}_student.pth", map_location=device)
     model.load_state_dict(ckpt)
     model.to(device).eval()
     child_models[cat] = model
     
 # ─── MASTER CNN INITIALISATION ────────────────────────────────────────────────
 if USE_MASTER_CNN:
-    master_ckpt = Path('dataset/cnn/cnn_master_best.pth')
+    master_ckpt = Path(f'{CNN_BASE_DIR}/cnn_master_best.pth')
     master_sd   = torch.load(master_ckpt, map_location=device)
 
     # infer number of classes from the saved head
@@ -112,11 +113,60 @@ if FONT_PATH and os.path.exists(FONT_PATH):
     font = ImageFont.truetype(FONT_PATH, 12)
 else:
     font = None
+    
+# ─── MERGE BOUNDING BOX HELPER ─────────────────────────────────────────────────────────
+def merge_overlapping_boxes(boxes, iou_thresh=0.3):
+    """
+    boxes: list of (x1,y1,x2,y2,cx,cy,cat)
+    returns merged list in the same format
+    boxes are only merged if they share the same `cat` and their IoU > iou_thresh
+    """
+    def iou(b1, b2):
+        x1 = max(b1[0], b2[0])
+        y1 = max(b1[1], b2[1])
+        x2 = min(b1[2], b2[2])
+        y2 = min(b1[3], b2[3])
+        inter = max(0, x2-x1) * max(0, y2-y1)
+        area1 = (b1[2]-b1[0])*(b1[3]-b1[1])
+        area2 = (b2[2]-b2[0])*(b2[3]-b2[1])
+        union = area1 + area2 - inter
+        return inter/union if union>0 else 0
+
+    merged = []
+    used = [False]*len(boxes)
+
+    for i, b in enumerate(boxes):
+        if used[i]:
+            continue
+        group = [b]
+        used[i] = True
+        # look for others to merge
+        for j, b2 in enumerate(boxes[i+1:], start=i+1):
+            if used[j] or b2[6] != b[6]:
+                continue
+            if iou(b, b2) > iou_thresh:
+                group.append(b2)
+                used[j] = True
+
+        # combine group into one box
+        xs1 = [g[0] for g in group]
+        ys1 = [g[1] for g in group]
+        xs2 = [g[2] for g in group]
+        ys2 = [g[3] for g in group]
+        nx1, ny1 = min(xs1), min(ys1)
+        nx2, ny2 = max(xs2), max(ys2)
+        ncat = b[6]
+        ncx = (nx1+nx2)/2
+        ncy = (ny1+ny2)/2
+
+        merged.append((nx1, ny1, nx2, ny2, ncx, ncy, ncat))
+
+    return merged
 
 # ─── MAIN PIPELINE ──────────────────────────────────────────────────────────────
-def run():
+def detect(screenshot_dir=SCREENSHOT_DIR, save_results_images=SAVE_RESULT_IMAGES, logging=True, cnn_thresh=CNN_CONF_THRESHOLD, yolo_thresh=YOLO_CONF_THRESHOLD):
     # Clean output dir
-    if SAVE_RESULT_IMAGES:
+    if save_results_images:
         os.makedirs(OUTPUT_DIR, exist_ok=True)
         for f in glob.glob(os.path.join(OUTPUT_DIR, '*')):
             if f.lower().endswith(('.png', '.jpg')):
@@ -124,22 +174,22 @@ def run():
 
     # Get reference map
     if USE_MASTER_CNN:
-        with open("dataset/cnn/master_mappings.json") as f:
+        with open(f"{CNN_BASE_DIR}/master_mappings.json") as f:
             raw = json.load(f)
         idx_to_card  = {int(k):v for k,v in raw["idx_to_card"].items()}
         idx_to_image = {int(k):v for k,v in raw["idx_to_image"].items()}
 
     # Prepare screenshots to process
-    shots = sorted(sum([glob.glob(os.path.join(SCREENSHOT_DIR, f'*.{ext}')) for ext in ('png','jpg')], []))
+    shots = sorted(sum([glob.glob(os.path.join(screenshot_dir, f'*.{ext}')) for ext in ('png','jpg')], []))
             
     # Initialise YOLO and CNN detectors, pay the startup cost by performing dummy actions
     detector = YOLO(YOLO_MODEL)
-    _ = detector.predict(np.zeros((640, 640, 3), dtype=np.uint8), conf=YOLO_CONF_THRESHOLD, verbose=False)
+    _ = detector.predict(np.zeros((640, 640, 3), dtype=np.uint8), conf=yolo_thresh, verbose=False)
     dummy = torch.zeros((1, 3, 224, 224), device=device)
     with torch.no_grad():
         for cat, mdl in child_models.items():
             _ = mdl(dummy)
-            logger.info(f"  ↳ warmed up child model '{cat}'")
+            if logging: logger.info(f"  ↳ warmed up child model '{cat}'")
 
     # Begin detection
     detections = {}
@@ -154,7 +204,7 @@ def run():
 
         # Detection
         dt0 = time.time()
-        results = detector.predict(arr, conf=YOLO_CONF_THRESHOLD, verbose=DEBUG)
+        results = detector.predict(arr, conf=yolo_thresh, verbose=DEBUG)
 
         # Extract boxes with center coordinates
         yolo_names = detector.model.names
@@ -170,6 +220,8 @@ def run():
 
         if not bboxes:
             continue
+        
+        bboxes = merge_overlapping_boxes(bboxes, iou_thresh=BBOX_IOU_THRESH)
 
         # Estimate row height by median box height
         heights = [y2 - y1 for x1, y1, x2, y2, *rest in bboxes]
@@ -200,7 +252,7 @@ def run():
                 matches = []
                 for i,p in enumerate(preds):
                     conf = float(softm[i, p])
-                    if conf >= CNN_CONF_THRESHOLD:
+                    if conf >= cnn_thresh:
                         output.append(idx_to_card[p])
                         matches.append(idx_to_image[p])
         else:
@@ -227,7 +279,7 @@ def run():
             filtered_output = []
             filtered_matches = []
             for o,m,c in zip(output, matches, confs):
-                if c >= CNN_CONF_THRESHOLD:
+                if c >= cnn_thresh:
                     filtered_output.append(o)
                     filtered_matches.append(m)
 
@@ -239,10 +291,10 @@ def run():
         class_time = time.time() - ct0
 
         tot = time.time() - tt0
-        logger.info(f"{bp:.25s} img:{image_load_time:.3f}s det:{det_time:.3f}s cls:{class_time:.3f}s | total time:{tot:.3f}s")
+        if logging: logger.info(f"{bp:.25s} img:{image_load_time:.3f}s det:{det_time:.3f}s cls:{class_time:.3f}s | total time:{tot:.3f}s")
 
         # Composite
-        if matches and SAVE_RESULT_IMAGES:
+        if matches and save_results_images:
             sv0 = time.time()
             n = len(matches)
             cols = min(GRID_COLS, n)
@@ -279,16 +331,16 @@ def run():
             out_path = os.path.join(OUTPUT_DIR, bp)
             combined.save(out_path)
             svt = time.time() - sv0
-            logger.info(f"{bp:.25s} | Saved result in {svt:.3f}s")
+            if logging: logger.info(f"{bp:.25s} | Saved result in {svt:.3f}s")
             
     allt = time.time() - all0
-    logger.info(f"Detection completed in {allt:.3f}s")
+    if logging: logger.info(f"Detection completed in {allt:.3f}s")
     return detections
 
 if __name__ == '__main__':
     full0 = time.time()
     logger.info("Starting pipeline with batch classification...")
-    results = run()
+    results = detect()
     fullt = time.time() - full0
     logger.info(json.dumps(results).replace("],", "],\n").replace("{", "\n ").replace("}", ""))
     logger.info(f"Full pipeline completed in {fullt:.3f}s")

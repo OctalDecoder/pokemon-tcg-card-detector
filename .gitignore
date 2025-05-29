@@ -2,8 +2,11 @@
 webscrape/data/
 dataset/cnn/train/
 dataset/cnn/val/
+dataset/cnn/v*/
 yolo/
 
 images/
 node_modules/
 runs/
+
+*.pyc
