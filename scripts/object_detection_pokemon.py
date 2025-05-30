@@ -1,3 +1,9 @@
+"""
+Early prototype for pokemon tcgp card detector.
+Uses SIFT + homography matching.
+Slow algorithm, only works for fixed resolution screenshots, no variation in UI or screens
+"""
+
 import cv2
 import numpy as np
 from matplotlib import pyplot as plt

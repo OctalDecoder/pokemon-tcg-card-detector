@@ -1,18 +1,28 @@
-# src/card_detector/__main__.py
-import argparse
-# from .yolo.detector import CardDetector
-# from .cnn.classifier import CardClassifier
-# from .video.processor import annotate_video
-from .proto.prototype import detect
+import logging
+from card_detector.config import cfg
+from card_detector.detectors.tcg_pocket_pipeline import CardDetectionPipeline
 
-def main():
-    p = argparse.ArgumentParser(description="Card Detector Pipeline")
-    # p.add_argument("--input",  "-i", required=True, help="Path to input video/image")
-    # p.add_argument("--output", "-o", required=True, help="Path for output")
-    args = p.parse_args()
+# Set up logging
+logging.basicConfig(format='%(asctime)s [%(levelname)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+logger = logging.getLogger(__name__)
+pcfg = cfg["prototype"]
+logger.setLevel(logging.DEBUG if pcfg["debug"] else logging.INFO)
+logging.getLogger('ultralytics').setLevel(logging.DEBUG if pcfg["debug"] else logging.WARNING)
 
-    # if args.input ends with .mp4 → video path
-    detect()
+# Prepare configs
+yolo_cfg = {
+    "yolo_model": pcfg["yolo_model"],
+    "yolo_conf_thresh": pcfg["yolo_conf_thresh"],
+    "bbox_iou_thresh": pcfg["bbox_iou_thresh"]
+}
+cnn_cfg = {
+    "cnn_subcats": pcfg["cnn_subcats"],
+    "cnn_base_dir": pcfg["cnn_base_dir"],
+    "cnn_conf_threshold": pcfg["cnn_conf_thresh"]
+}
 
-if __name__ == "__main__":
-    main()
+# Run pipeline
+pipeline = CardDetectionPipeline(yolo_cfg, cnn_cfg, pcfg, logger=logger)
+logger.info("Starting pipeline with batch classification...")
+results = pipeline.process_images()
+logger.info(results)

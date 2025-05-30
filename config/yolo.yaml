@@ -1,4 +1,4 @@
-# Paths to image/label folders
+# Paths to yolo training and evaluation folders
 train: data/yolo/images/train
 val: data/yolo/images/val
 

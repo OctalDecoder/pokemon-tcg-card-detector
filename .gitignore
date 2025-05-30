@@ -3,4 +3,7 @@ output/
 card_detector.egg-info/
 tests/fixtures
 
+__pycache__/
 *.pyc
+
+.vscode/
