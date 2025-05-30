@@ -1,6 +1,6 @@
 import logging
 from card_detector.config import cfg
-from card_detector.detectors.tcg_pocket_pipeline import CardDetectionPipeline
+from card_detector.detectors.screenshot_pipeline import ScreenshotPipeline
 
 # Set up logging
 logging.basicConfig(format='%(asctime)s [%(levelname)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')

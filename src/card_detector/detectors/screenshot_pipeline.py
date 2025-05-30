@@ -51,7 +51,7 @@ def merge_overlapping_boxes(boxes, iou_thresh=0.3):
 def load_thumb(path: str):
     return Image.open(path).convert('RGB')
 
-class CardDetectionPipeline:
+class ScreenshotPipeline:
     def __init__(self, yolo_cfg, cnn_cfg, pcfg, logger=None):
         import torch
         self.pcfg = pcfg
@@ -75,7 +75,7 @@ class CardDetectionPipeline:
         if pcfg.get("font_path") and os.path.exists(pcfg["font_path"]):
             self.font = ImageFont.truetype(pcfg["font_path"], 12)
 
-    def process_images(self, screenshot_dir=None, save_results_images=True, logging=True):
+    def process_images(self, screenshot_dir=None, save_results_images=None, logging=True):
         pcfg = self.pcfg
         screenshot_dir = screenshot_dir or pcfg["screenshot_dir"]
         save_results_images = save_results_images if save_results_images is not None else pcfg["save_result_images"]
@@ -144,5 +144,6 @@ class CardDetectionPipeline:
                 self.logger.info(f"{bp:.25s} processed")
         allt = time.time() - all0
         if logging and self.logger:
-            self.logger.info(f"Detection completed in {allt:.3f}s")
+            instances = sum([len(cards) for cards in detections.values()])
+            self.logger.info(f"Detected {instances} cards from {len(shots)} screenshots in {allt:.3f} seconds ({len(shots)/allt:.3f}FPS)")
         return detections
