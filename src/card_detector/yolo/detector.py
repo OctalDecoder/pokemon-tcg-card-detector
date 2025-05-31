@@ -9,7 +9,8 @@ class YoloDetector:
         self.iou_thresh = iou_thresh
         self.device = device
         self.debug = debug
-        # Warm up (optional)
+        
+        # Move model onto GPU so its ready for use (saves time on the first frame detection later)
         _ = self.model.predict(np.zeros((640, 640, 3), dtype=np.uint8), conf=conf_thresh, verbose=False)
     
     def detect(self, image):
