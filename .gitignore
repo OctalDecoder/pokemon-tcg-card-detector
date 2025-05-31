@@ -1,12 +1,9 @@
-*_train/
-webscrape/data/
-dataset/cnn/train/
-dataset/cnn/val/
-dataset/cnn/v*/
-yolo/
+data/
+output/
+card_detector.egg-info/
+tests/fixtures
 
-images/
-node_modules/
-runs/
-
+__pycache__/
 *.pyc
+
+.vscode/

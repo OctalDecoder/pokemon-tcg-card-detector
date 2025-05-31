@@ -1,0 +1,64 @@
+shared:
+  random_seed: 42
+  base_dir: "data"
+  raw_img_root: "data/raw/cards"
+  output_dir: "output"
+  log_level: "INFO"
+
+yolo:
+  data_config: "config/yolo.yaml"
+  model_name: "tcgp_card_detector"
+  batch_size: 16
+  epochs: 25
+  img_size: 640
+  device: 0
+  lr0: 0.001
+  lr_final_factor: 0.01
+  patience: 5
+
+yolo_datagen:
+  source_dir: "images/cards"
+  background_dir: "images/backgrounds"
+  output_img_dir: "data/yolo/images/train"
+  output_label_dir: "data/yolo/labels/train"
+  val_split: 0.2
+  allowed_ext: [".png", ".jpg", ".jpeg"]
+  variants_per: 100
+
+cnn:
+  data_root: "data/cnn"
+  train_dir: "data/cnn/train"
+  val_dir: "data/cnn/val"
+  master_ckpt: "output/cnn_master_best.pth"
+  batch_size: 32
+  weight_decay: 0.02
+  lr_master: 0.0003
+  lr_student: 0.0002
+  t_kd: 4.0
+  alpha_ce: 0.2
+  img_size: 224
+
+cnn_datagen:
+  source_dir: "images/cards"
+  output_train_dir: "data/cnn/train"
+  output_val_dir: "data/cnn/val"
+  val_split: 0.2
+  allowed_ext: [".png", ".jpg", ".jpeg"]
+  variants_per: 120
+  random_seed: 132
+
+prototype:
+  debug: False
+  use_master_cnn: False
+  save_result_images: True
+  screenshot_dir: "tests/fixtures"
+  output_dir: "output/tests"
+  grid_cols: 5
+  middle_space: 20
+  font_path: null
+  yolo_model: "models/card_detector.pt"
+  yolo_conf_thresh: 0.1
+  bbox_iou_thresh: 0.3
+  cnn_base_dir: "models/"
+  cnn_conf_thresh: 0.15
+  cnn_subcats: ["fullart", "standard"]
