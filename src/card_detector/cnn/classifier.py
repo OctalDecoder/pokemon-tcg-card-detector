@@ -7,7 +7,7 @@ from torchvision import transforms
 import json
 
 class CnnClassifier:
-    def __init__(self, subcats, cnn_base_dir, conf_threshold=0.15, device='cuda'):
+    def __init__(self, subcats, cnn_model_dir, conf_threshold=0.15, device='cuda'):
         self.subcats = subcats
         self.device = device
         self.conf_threshold = conf_threshold
@@ -19,11 +19,11 @@ class CnnClassifier:
             transforms.ToTensor(),
             transforms.Normalize(mean=[.485, .456, .406], std=[.229, .224, .225]),
         ])
-        self._load_models(cnn_base_dir)
+        self._load_models(cnn_model_dir)
 
-    def _load_models(self, cnn_base_dir):
+    def _load_models(self, cnn_model_dir):
         for cat in self.subcats:
-            with open(f"{cnn_base_dir}/{cat}_mappings.json") as f:
+            with open(f"{cnn_model_dir}/{cat}_mappings.json") as f:
                 raw = json.load(f)
             idx2card = {int(k): v for k, v in raw["idx_to_card"].items()}
             idx2image = {int(k): v for k, v in raw["idx_to_image"].items()}
@@ -31,7 +31,7 @@ class CnnClassifier:
             model = mobilenet_v3_small(weights=MobileNet_V3_Small_Weights.IMAGENET1K_V1)
             in_f = model.classifier[3].in_features
             model.classifier[3] = nn.Linear(in_f, len(idx2card))
-            ckpt = torch.load(f"{cnn_base_dir}/cnn_{cat}_student.pth", map_location=self.device)
+            ckpt = torch.load(f"{cnn_model_dir}/cnn_{cat}_student.pth", map_location=self.device)
             model.load_state_dict(ckpt)
             model.to(self.device).eval()
             self.child_models[cat] = model

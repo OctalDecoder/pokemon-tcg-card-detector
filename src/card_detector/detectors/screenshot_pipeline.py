@@ -65,8 +65,8 @@ class ScreenshotPipeline:
             device=self.device
         )
         self.cnn = CnnClassifier(
-            subcats=cnn_cfg["cnn_subcats"],
-            cnn_base_dir=cnn_cfg["cnn_base_dir"],
+            subcats=cnn_cfg["classifiers"],
+            cnn_model_dir=cnn_cfg["cnn_model_dir"],
             conf_threshold=cnn_cfg.get("cnn_conf_threshold", 0.15),
             device=self.device
         )
@@ -78,12 +78,13 @@ class ScreenshotPipeline:
     def process_images(self, screenshot_dir=None, save_results_images=None, logging=True):
         pcfg = self.pcfg
         screenshot_dir = screenshot_dir or pcfg["screenshot_dir"]
-        save_results_images = save_results_images if save_results_images is not None else pcfg["save_result_images"]
-
+        save_results_images = save_results_images if save_results_images is not None else pcfg["save_results"]
+        output_dir = pcfg["output_dir"] + "/screenshot_pipeline"
+        
         # Clean output dir
         if save_results_images:
-            os.makedirs(pcfg["output_dir"], exist_ok=True)
-            for f in glob.glob(os.path.join(pcfg["output_dir"], '*')):
+            os.makedirs(output_dir, exist_ok=True)
+            for f in glob.glob(os.path.join(output_dir, '*')):
                 if f.lower().endswith(('.png', '.jpg')):
                     os.remove(f)
         # Prepare screenshots
@@ -138,7 +139,7 @@ class ScreenshotPipeline:
                 combined = Image.new('RGB', (left_w + pcfg["middle_space"] + right.width, left_h), (0, 0, 0))
                 combined.paste(left, (0, 0))
                 combined.paste(right, (left_w + pcfg["middle_space"], 0))
-                out_path = os.path.join(pcfg["output_dir"], bp)
+                out_path = os.path.join(output_dir, bp)
                 combined.save(out_path)
             if logging and self.logger:
                 self.logger.info(f"{bp:.25s} processed")

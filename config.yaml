@@ -1,10 +1,37 @@
+# --------- SHARED ---------------------------------------------------------------------------------------
 shared:
-  random_seed: 42
-  base_dir: "data"
-  raw_img_root: "data/raw/cards"
-  output_dir: "output"
-  log_level: "INFO"
+  # Detection
+  screenshot_dir: "tests/fixtures" # Directory containing screenshots to process
+  video_dir: "tests/videos" # Directory containing videos to process
 
+  # Models
+  classifiers: ["fullart", "standard"]
+  yolo_model: "models/yolo_card_detector.pt"
+  cnn_model_dir: "models/" # One master CNN, one student CNN per classifier, CNN mappings file
+
+  # Training
+  random_seed: 42
+  card_images_dir: "data/raw/cards" # Directory containing labelled cards
+  training_data_dir: "data/"
+  output_dir: "output/"
+
+  # General
+  debug: False
+
+# --------- SCREENSHOT DETECTOR --------------------------------------------------------------------------
+screenshot_pipeline:
+  use_master_cnn: False # If true, distilled student CNNs are ignored
+  yolo_conf_thresh: 0.1
+  cnn_conf_thresh: 0.15
+  bbox_iou_thresh: 0.3 # Yolo outputs overlapping by this value will be merged if possible (0 = off)
+
+  # Results
+  save_results: True
+  grid_cols: 5
+  middle_space: 20
+  font_path: null
+
+# --------- YOLO -----------------------------------------------------------------------------------------
 yolo:
   data_config: "config/yolo.yaml"
   model_name: "tcgp_card_detector"
@@ -25,6 +52,7 @@ yolo_datagen:
   allowed_ext: [".png", ".jpg", ".jpeg"]
   variants_per: 100
 
+# --------- CNN ------------------------------------------------------------------------------------------
 cnn:
   data_root: "data/cnn"
   train_dir: "data/cnn/train"
@@ -46,19 +74,3 @@ cnn_datagen:
   allowed_ext: [".png", ".jpg", ".jpeg"]
   variants_per: 120
   random_seed: 132
-
-prototype:
-  debug: False
-  use_master_cnn: False
-  save_result_images: True
-  screenshot_dir: "tests/fixtures"
-  output_dir: "output/tests"
-  grid_cols: 5
-  middle_space: 20
-  font_path: null
-  yolo_model: "models/card_detector.pt"
-  yolo_conf_thresh: 0.1
-  bbox_iou_thresh: 0.3
-  cnn_base_dir: "models/"
-  cnn_conf_thresh: 0.15
-  cnn_subcats: ["fullart", "standard"]

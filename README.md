@@ -1,13 +1,42 @@
 ## Table of Contents
 
+- [General TODO](#general-todo)
 - [Project Summary](#project-summary)
 - [Repository Setup Guide (WIP)](#repository-setup-guide-wip)
-- [General TODO](#general-todo)
 - [Real Time Processing Research Suggestions](#real-time-processing-reasearch-suggestions)
   - [YOLOv8 Tracking + pHash Filtering](#yolov8-tracking--phash-filtering)
   - [Pruning, Quantization & Distillation](#pruning-quantization--distillation)
   - [Asynchronous Pipeline & GPU Pipelines](#asynchronous-pipeline--gpu-pipelines)
   - [Extra Notes](#extra-notes)
+
+---
+
+## General TODO
+
+- [x] Move global variables into `config.yaml`
+- [ ] Unify mappings for CNN into a single file
+- [ ] Combine `yolo.yaml` into `config.yaml` (if possible)
+- [x] Refactor `prototype.py` into separate classes:
+  - [x] **YOLO** logic
+  - [x] **CNN** logic
+- [x] Complete `Makefile` (build, test, CLI shortcuts)
+- [ ] Write and run tests for:
+  - [ ] `cnn/` modules
+  - [ ] `yolo/` modules
+  - [ ] `train/` scripts
+  - [ ] `generate_data/` scripts
+- [ ] Get all tests passing (fix thresholds, edge cases, etc.)
+- [ ] Create `requirements.txt` (pin dependencies)
+- [ ] Verify `setup.py` is production-ready
+- [ ] Implement detection classes:
+  - [ ] **ImageDetection** (single images)
+  - [ ] **VideoDetection** (frame-by-frame)
+- [ ] Evaluate moving to mobile-capable student models (e.g., TinyML-friendly architectures)
+- [ ] Investigate impact of using the current model with cards its never seen or trained on (no CNN classification)
+- [ ] Test integration of new cards from the latest expansion pack
+- [ ] (Optional) Add CI/CD workflows (e.g., GitHub Actions)
+- [ ] Finalize README so it’s a true “README” rather than a living to-do list
+- [ ] SLEEP 😴
 
 ---
 
@@ -75,33 +104,16 @@ In essence, this project unifies state-of-the-art object detection and tracking 
    - A `shared_config.yaml` is loaded by each sub-config.
    - Shared values have lower priority and will **not** override values defined in individual config files (e.g., `yolo.yaml`, `cnn.yaml`).
 
----
+### WIP NOTES
 
-## General TODO
+The images for training and identification must be stored with the following structure:
 
-- [ ] Move global variables into `config.yaml`
-- [ ] Combine `yolo.yaml` into `config.yaml` (if possible)
-- [x] Refactor `prototype.py` into separate classes:
-  - [x] **YOLO** logic
-  - [x] **CNN** logic
-- [x] Complete `Makefile` (build, test, CLI shortcuts)
-- [ ] Write and run tests for:
-  - [ ] `cnn/` modules
-  - [ ] `yolo/` modules
-  - [ ] `train/` scripts
-  - [ ] `generate_data/` scripts
-- [ ] Get all tests passing (fix thresholds, edge cases, etc.)
-- [ ] Create `requirements.txt` (pin dependencies)
-- [ ] Verify `setup.py` is production-ready
-- [ ] Implement detection classes:
-  - [ ] **ImageDetection** (single images)
-  - [ ] **VideoDetection** (frame-by-frame)
-- [ ] Evaluate moving to mobile-capable student models (e.g., TinyML-friendly architectures)
-- [ ] Investigate impact of using the current model with cards its never seen or trained on (no CNN classification)
-- [ ] Test integration of new cards from the latest expansion pack
-- [ ] (Optional) Add CI/CD workflows (e.g., GitHub Actions)
-- [ ] Finalize README so it’s a true “README” rather than a living to-do list
-- [ ] SLEEP 😴
+1.  Base directory should match `config.yaml -> shared -> card_images_dir`.
+2.  The base directory should contain subfolders named `config.yaml -> shared -> classifiers`.
+3.  Images should be placed inside their appropriate subfolders, labelled in the format `[SeriesID] [CardID].png`.
+
+Example image path for `cards_images_dir: data/raw/cards`, `classifiers: fullart, standard`:
+`data/raw/cards/standard/A2b 32.png`
 
 ---
 
