@@ -1,4 +1,3 @@
-# detectors/card_detection_pipeline.py
 import os
 import math
 import glob
@@ -7,8 +6,9 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 from functools import lru_cache
 
-from card_detector.yolo.detector import YoloDetector
+from card_detector.database.database import CardDB
 from card_detector.cnn.classifier import CnnClassifier
+from card_detector.yolo.detector import YoloDetector
 
 def merge_overlapping_boxes(boxes, iou_thresh=0.3):
     def iou(b1, b2):
@@ -70,10 +70,20 @@ class ScreenshotPipeline:
             conf_threshold=cnn_cfg.get("cnn_conf_threshold", 0.15),
             device=self.device
         )
+        self.card_db = CardDB(pcfg["database"])
         # Font
         self.font = None
         if pcfg.get("font_path") and os.path.exists(pcfg["font_path"]):
             self.font = ImageFont.truetype(pcfg["font_path"], 12)
+            
+    def get_db_thumb(self, series_id, card_id):
+        img = self.card_db.get_image_blob_by_seriesid_id(series_id, card_id)
+        if img:
+            return img.convert('RGB')
+        else:
+            # fallback image if missing
+            print(f"Failed to fetch image for: {series_id} {card_id}")
+            return Image.new('RGB', (128, 180), (80, 80, 80))
 
     def process_images(self, screenshot_dir=None, save_results_images=None, logging=True):
         pcfg = self.pcfg
@@ -111,23 +121,23 @@ class ScreenshotPipeline:
             )
             crops = [orig.crop(tuple(map(int, b[:4]))) for b in sorted_boxes]
             cats = [b[6] for b in sorted_boxes]
-            output, matches = self.cnn.classify(crops, cats)
-            detections[bp] = output
+            output, _ = self.cnn.classify(crops, cats)
+            detections[bp] = [f"{s} - {self.card_db.get_name_by_seriesid_id(*s.split(" "))}" for s in output]
 
             # Save results image
-            if matches and save_results_images:
-                n = len(matches)
+            if output and save_results_images:
+                n = len(output)
                 cols = min(pcfg["grid_cols"], n)
                 rows = math.ceil(n / cols)
-                first_thumb = next((m for m in matches if m), None)
+                first_thumb = next((m for m in output if m), None)
                 if first_thumb is None:
                     continue
-                tw, th = load_thumb(first_thumb).size
+                tw, th = self.get_db_thumb(*first_thumb.split(" ")).size
                 right = Image.new('RGB', (cols * tw, rows * th), (0, 0, 0))
                 draw = ImageDraw.Draw(right)
-                for i, m in enumerate(matches):
+                for i, m in enumerate(output):
                     if m:
-                        thumb = load_thumb(m).resize((tw, th), Image.LANCZOS)
+                        thumb = self.get_db_thumb(*m.split(" ")).resize((tw, th), Image.LANCZOS)
                         r, c = divmod(i, cols)
                         right.paste(thumb, (c * tw, r * th))
                         if self.font:

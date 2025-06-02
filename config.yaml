@@ -7,7 +7,7 @@ shared:
   # Models
   classifiers: ["fullart", "standard"]
   yolo_model: "models/yolo_card_detector.pt"
-  cnn_model_dir: "models/" # One master CNN, one student CNN per classifier, CNN mappings file
+  cnn_model_dir: "models/"
 
   # Training
   random_seed: 42
@@ -17,6 +17,7 @@ shared:
 
   # General
   debug: False
+  database: "models/cards.db"
 
 # --------- SCREENSHOT DETECTOR --------------------------------------------------------------------------
 screenshot_pipeline:

@@ -15,8 +15,10 @@
 
 - [x] Move global variables into `config.yaml`
 - [x] Unify mappings for CNN into a single file
-- [ ] Move all images into a database with all the webscraped data
-- [ ] Combine `yolo.yaml` into `config.yaml` (if possible)
+- [x] Move all images into a database with all the webscraped data
+- [ ] Remove URLs from CNN mappings
+- [ ] Update database types, currently all `string`
+- [x] ~~Combine yolo.yaml into config.yaml` (if possible)~~ (its more maintainable this way :c)
 - [x] Refactor `prototype.py` into separate classes:
   - [x] **YOLO** logic
   - [x] **CNN** logic
@@ -36,7 +38,7 @@
 - [ ] Investigate impact of using the current model with cards its never seen or trained on (no CNN classification)
 - [ ] Test integration of new cards from the latest expansion pack
 - [ ] (Optional) Add CI/CD workflows (e.g., GitHub Actions)
-- [ ] Finalize README so it’s a true “README” rather than a living to-do list
+- [ ] Finalize README so it's a true "README" rather than a living to-do list
 - [ ] SLEEP 😴
 
 ---
