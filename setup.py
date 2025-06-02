@@ -16,6 +16,7 @@ setup(
     entry_points={
         "console_scripts": [
             "card-detector=card_detector.__main__:main",
+            "train-cnn = card_detector.cnn.train:main"
         ],
     },
 )

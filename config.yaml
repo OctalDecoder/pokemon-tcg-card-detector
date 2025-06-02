@@ -54,10 +54,6 @@ yolo_datagen:
 
 # --------- CNN ------------------------------------------------------------------------------------------
 cnn:
-  data_root: "data/cnn"
-  train_dir: "data/cnn/train"
-  val_dir: "data/cnn/val"
-  master_ckpt: "output/cnn_master_best.pth"
   batch_size: 32
   weight_decay: 0.02
   lr_master: 0.0003

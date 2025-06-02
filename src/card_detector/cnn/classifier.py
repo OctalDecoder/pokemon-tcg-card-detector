@@ -22,11 +22,12 @@ class CnnClassifier:
         self._load_models(cnn_model_dir)
 
     def _load_models(self, cnn_model_dir):
+        with open(f"{cnn_model_dir}/cnn_mappings.json") as f:
+            raw = json.load(f)["students"]
         for cat in self.subcats:
-            with open(f"{cnn_model_dir}/{cat}_mappings.json") as f:
-                raw = json.load(f)
-            idx2card = {int(k): v for k, v in raw["idx_to_card"].items()}
-            idx2image = {int(k): v for k, v in raw["idx_to_image"].items()}
+            raw_student = raw[cat]
+            idx2card = {int(k): v for k, v in raw_student["idx_to_card"].items()}
+            idx2image = {int(k): v for k, v in raw_student["idx_to_image"].items()}
             self.child_maps[cat] = (idx2card, idx2image)
             model = mobilenet_v3_small(weights=MobileNet_V3_Small_Weights.IMAGENET1K_V1)
             in_f = model.classifier[3].in_features

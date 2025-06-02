@@ -14,7 +14,8 @@
 ## General TODO
 
 - [x] Move global variables into `config.yaml`
-- [ ] Unify mappings for CNN into a single file
+- [x] Unify mappings for CNN into a single file
+- [ ] Move all images into a database with all the webscraped data
 - [ ] Combine `yolo.yaml` into `config.yaml` (if possible)
 - [x] Refactor `prototype.py` into separate classes:
   - [x] **YOLO** logic
