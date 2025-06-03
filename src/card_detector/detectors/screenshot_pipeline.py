@@ -47,10 +47,6 @@ def merge_overlapping_boxes(boxes, iou_thresh=0.3):
         merged.append((nx1, ny1, nx2, ny2, ncx, ncy, ncat))
     return merged
 
-@lru_cache(maxsize=None)
-def load_thumb(path: str):
-    return Image.open(path).convert('RGB')
-
 class ScreenshotPipeline:
     def __init__(self, yolo_cfg, cnn_cfg, pcfg, logger=None):
         import torch
@@ -83,7 +79,7 @@ class ScreenshotPipeline:
         else:
             # fallback image if missing
             print(f"Failed to fetch image for: {series_id} {card_id}")
-            return Image.new('RGB', (128, 180), (80, 80, 80))
+            return Image.new('RGB', (32, 45), (80, 80, 80))
 
     def process_images(self, screenshot_dir=None, save_results_images=None, logging=True):
         pcfg = self.pcfg
@@ -132,7 +128,7 @@ class ScreenshotPipeline:
                 first_thumb = next((m for m in output if m), None)
                 if first_thumb is None:
                     continue
-                tw, th = self.get_db_thumb(*first_thumb.split(" ")).size
+                tw, th = (184, 256) # Set output size for images
                 right = Image.new('RGB', (cols * tw, rows * th), (0, 0, 0))
                 draw = ImageDraw.Draw(right)
                 for i, m in enumerate(output):
