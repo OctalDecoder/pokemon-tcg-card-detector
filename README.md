@@ -91,19 +91,21 @@ This repository implements a high-performance TCG (Trading Card Game) card detec
 
 In essence, this project unifies state-of-the-art object detection and tracking (YOLOv8 + ByteTrack), perceptual hashing for ultra-fast duplicate filtering, and highly optimized neural network inference (pruning, quantization, distillation) into an end-to-end system capable of recognizing and classifying large batches of TCG cards in near real time.
 
----
-
-# 📁 Repository Setup Guide
+## 📁 Repository Setup Guide
 
 > **This guide describes how to configure, structure, and use this repo.** > _WIP: Feedback and edits welcome!_
 
-## 1. Prerequisites
+---
+
+### 1. Prerequisites
 
 - Python ≥ 3.12
 - [pip](https://pip.pypa.io/en/stable/) (latest recommended)
 - `git` (for cloning, version control)
 
-## 2. Installation
+---
+
+### 2. Installation
 
 ```bash
 # Clone the repository
@@ -114,21 +116,27 @@ cd Pokemon\ TCG\ Pocket\ Card\ Detection/
 pip install -e .
 ```
 
-## 3. Screenshots for Testing
+---
+
+### 3. Screenshots for Testing
 
 - Place images to be processed in:
   `tests/fixtures/`
 - **To change this location:**
   Edit `config.yaml` → `shared` → `screenshot_dir`.
 
-## 4. Data & Intermediate Model Files
+---
+
+### 4. Data & Intermediate Model Files
 
 - High-resolution TCG card images live in:
   `data/raw/cards/`
 - All temporary checkpoints, embeddings, and intermediate files are created in:
   `data/`
 
-## 5. Database Setup
+---
+
+### 5. Database Setup
 
 - **Download or obtain** the database (`cards.db`) from \[TBD download link or instructions].
 - Place it in:
@@ -136,7 +144,9 @@ pip install -e .
 - **To change this location:**
   Edit `config.yaml` → `shared` → `database`
 
-## 6. Configuration Structure
+---
+
+### 6. Configuration Structure
 
 - The main configuration file is `config.yaml`.
 - The `shared` section merges into all other config sections:
@@ -146,7 +156,9 @@ pip install -e .
 
     - `shared` values are populated into all other sections. These individual config sections (e.g., `yolo`, `cnn`) take precedence over `shared` for conflicting values.
 
-## 7. Card Image Directory & Naming Convention
+---
+
+### 7. Card Image Directory & Naming Convention
 
 - **Base directory:**
   Controlled by `config.yaml` → `shared` → `card_images_dir`
@@ -162,7 +174,9 @@ data/raw/cards/standard/A2b 32.png
 data/raw/cards/fullart/S5 100.png
 ```
 
-## 8. Output Directories
+---
+
+### 8. Output Directories
 
 - By default, processed images, results, and generated data will be written to:
 
@@ -170,7 +184,9 @@ data/raw/cards/fullart/S5 100.png
 
 - Subdirectories (e.g., `output/screenshot_pipeline/`) are automatically created as needed.
 
-## 9. Running the Pipeline
+---
+
+### 9. Running the Pipeline
 
 To process screenshots and generate results:
 
@@ -178,7 +194,9 @@ To process screenshots and generate results:
 card-detector
 ```
 
-## 10. Work-in-Progress Notes
+---
+
+### 10. Work-in-Progress Notes
 
 - Documentation is evolving; structure and locations may shift.
 - Database download location is **TBD**.
@@ -186,7 +204,7 @@ card-detector
 
 ---
 
-## ⚠️ Quick Reference
+### ⚠️ Quick Reference
 
 | Purpose                   | Path              | Config Key               |
 | ------------------------- | ----------------- | ------------------------ |
