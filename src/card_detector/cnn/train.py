@@ -4,7 +4,7 @@ Train an EfficientNet-B0 "master" model, then distill MobileNetV3-Small "student
 
 Output:
 master_cnn
-student_cnn
+student_cnn (one per config.yaml -> classifiers)
 mappings.json
 """
 
@@ -13,7 +13,7 @@ import json
 import argparse
 from pathlib import Path
 from PIL import Image
-from typing import Tuple, List
+from typing import List
 
 import torch
 from torch import nn, optim
@@ -25,7 +25,6 @@ from torchvision.models import (
     mobilenet_v3_small, MobileNet_V3_Small_Weights,
 )
 
-# CHANGE THIS TO YOUR CONFIG IMPORT AS NEEDED!
 from card_detector.config import cfg
 
 CONFIG = cfg["cnn"]

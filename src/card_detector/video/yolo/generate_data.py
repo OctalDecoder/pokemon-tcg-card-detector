@@ -2,7 +2,6 @@ import os
 import glob
 import random
 from PIL import Image
-import numpy as np
 from concurrent.futures import ProcessPoolExecutor
 
 # ─── CONFIGURATION ─────────────────────────────────────────────────────────────

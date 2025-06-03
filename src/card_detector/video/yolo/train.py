@@ -1,6 +1,6 @@
 import multiprocessing
 from ultralytics import YOLO
-from ..config import cfg
+from card_detector.config import cfg
 
 if __name__ == '__main__':
     ycfg = cfg["yolo"]
