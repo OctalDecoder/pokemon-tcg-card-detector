@@ -23,7 +23,7 @@
 - [x] Refactor `prototype.py` into separate classes:
   - [x] **YOLO** logic
   - [x] **CNN** logic
-- [x] Complete `Makefile` (build, test, CLI shortcuts)
+- [x] ~~Complete `Makefile` (build, test, CLI shortcuts)~~ (now in `pyproject.toml`)
 - [ ] Write and run tests for:
   - [ ] `cnn/` modules
   - [ ] `yolo/` modules
@@ -97,15 +97,11 @@ In essence, this project unifies state-of-the-art object detection and tracking 
 
 > **This guide describes how to configure, structure, and use this repo.** > _WIP: Feedback and edits welcome!_
 
----
-
 ## 1. Prerequisites
 
 - Python ≥ 3.12
 - [pip](https://pip.pypa.io/en/stable/) (latest recommended)
 - `git` (for cloning, version control)
-
----
 
 ## 2. Installation
 
@@ -118,16 +114,12 @@ cd Pokemon\ TCG\ Pocket\ Card\ Detection/
 pip install -e .
 ```
 
----
-
 ## 3. Screenshots for Testing
 
 - Place images to be processed in:
   `tests/fixtures/`
 - **To change this location:**
   Edit `config.yaml` → `shared` → `screenshot_dir`.
-
----
 
 ## 4. Data & Intermediate Model Files
 
@@ -136,8 +128,6 @@ pip install -e .
 - All temporary checkpoints, embeddings, and intermediate files are created in:
   `data/`
 
----
-
 ## 5. Database Setup
 
 - **Download or obtain** the database (`cards.db`) from \[TBD download link or instructions].
@@ -145,8 +135,6 @@ pip install -e .
   `models/cards.db`
 - **To change this location:**
   Edit `config.yaml` → `shared` → `database`
-
----
 
 ## 6. Configuration Structure
 
@@ -157,8 +145,6 @@ pip install -e .
   - **Override priority:**
 
     - `shared` values are populated into all other sections. These individual config sections (e.g., `yolo`, `cnn`) take precedence over `shared` for conflicting values.
-
----
 
 ## 7. Card Image Directory & Naming Convention
 
@@ -176,8 +162,6 @@ data/raw/cards/standard/A2b 32.png
 data/raw/cards/fullart/S5 100.png
 ```
 
----
-
 ## 8. Output Directories
 
 - By default, processed images, results, and generated data will be written to:
@@ -186,8 +170,6 @@ data/raw/cards/fullart/S5 100.png
 
 - Subdirectories (e.g., `output/screenshot_pipeline/`) are automatically created as needed.
 
----
-
 ## 9. Running the Pipeline
 
 To process screenshots and generate results:
@@ -195,8 +177,6 @@ To process screenshots and generate results:
 ```bash
 card-detector
 ```
-
----
 
 ## 10. Work-in-Progress Notes
 
@@ -214,8 +194,6 @@ card-detector
 | Raw card images           | `data/raw/cards/` | `shared.card_images_dir` |
 | Database file             | `models/cards.db` | `shared.database`        |
 | Output/results            | `output/`         | `shared.output_dir`      |
-
----
 
 ## Real Time Processing Reasearch Suggestions
 
