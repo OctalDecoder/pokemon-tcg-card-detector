@@ -2,14 +2,10 @@
 cnn_master_and_distill.py  (auto-detects sub-categories)
 Train an EfficientNet-B0 "master" model, then distill MobileNetV3-Small "students" for each subfolder.
 
-All mappings are stored in a single cnn_mappings.json:
-{
-  "master": { ... },
-  "students": {
-    "fullart": { ... },
-    "standard": { ... }
-  }
-}
+Output:
+master_cnn
+student_cnn
+mappings.json
 """
 
 import os
@@ -77,23 +73,13 @@ def save_master_mapping(class_to_idx, master_train_roots):
         else:
             idx_to_image[str(idx)] = None
     mappings = load_all_mappings()
-    mappings["master"] = {
-        "idx_to_card": {str(k): v for k, v in idx_to_card.items()},
-        "idx_to_image": idx_to_image
-    }
+    mappings["master"] = {str(k): v for k, v in idx_to_card.items()}
     save_all_mappings(mappings)
 
-def save_student_mapping(cat, class_to_idx, raw_dir):
+def save_student_mapping(cat, class_to_idx):
     idx_to_card = {idx: cls for cls, idx in class_to_idx.items()}
-    idx_to_image = {str(idx): str(next(raw_dir.glob(f"{cls}.*"), None))
-                    for cls, idx in class_to_idx.items()}
     mappings = load_all_mappings()
-    if "students" not in mappings:
-        mappings["students"] = {}
-    mappings["students"][cat] = {
-        "idx_to_card": {str(k): v for k, v in idx_to_card.items()},
-        "idx_to_image": idx_to_image
-    }
+    mappings[cat] = {str(k): v for k, v in idx_to_card.items()}
     save_all_mappings(mappings)
 
 # ─────────────── Helper utilities ───────────────
@@ -251,7 +237,7 @@ def distil_student(cat: str, teacher_ckpt: Path, epochs: int, device: str):
     tr_p, va_p = TRAIN_DIR / cat, VAL_DIR / cat
     train_loader, val_loader, nc = build_loaders(tr_p, va_p)
     train_ds = train_loader.dataset
-    save_student_mapping(cat, train_ds.class_to_idx, RAW_IMG_ROOT / cat)
+    save_student_mapping(cat, train_ds.class_to_idx)
 
     teacher = efficientnet_b0()
     in_ft = teacher.classifier[1].in_features

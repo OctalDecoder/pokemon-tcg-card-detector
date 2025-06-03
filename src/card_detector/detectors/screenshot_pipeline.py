@@ -121,7 +121,7 @@ class ScreenshotPipeline:
             )
             crops = [orig.crop(tuple(map(int, b[:4]))) for b in sorted_boxes]
             cats = [b[6] for b in sorted_boxes]
-            output, _ = self.cnn.classify(crops, cats)
+            output = self.cnn.classify(crops, cats)
             detections[bp] = [f"{s} - {self.card_db.get_name_by_seriesid_id(*s.split(" "))}" for s in output]
 
             # Save results image

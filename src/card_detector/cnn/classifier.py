@@ -23,15 +23,12 @@ class CnnClassifier:
 
     def _load_models(self, cnn_model_dir):
         with open(f"{cnn_model_dir}/cnn_mappings.json") as f:
-            raw = json.load(f)["students"]
+            raw = json.load(f)
         for cat in self.subcats:
-            raw_student = raw[cat]
-            idx2card = {int(k): v for k, v in raw_student["idx_to_card"].items()}
-            idx2image = {int(k): v for k, v in raw_student["idx_to_image"].items()}
-            self.child_maps[cat] = (idx2card, idx2image)
+            self.child_maps[cat] = {int(k): v for k, v in raw[cat].items()}
             model = mobilenet_v3_small(weights=MobileNet_V3_Small_Weights.IMAGENET1K_V1)
             in_f = model.classifier[3].in_features
-            model.classifier[3] = nn.Linear(in_f, len(idx2card))
+            model.classifier[3] = nn.Linear(in_f, len(raw[cat]))
             ckpt = torch.load(f"{cnn_model_dir}/cnn_{cat}_student.pth", map_location=self.device)
             model.load_state_dict(ckpt)
             model.to(self.device).eval()
@@ -39,7 +36,6 @@ class CnnClassifier:
 
     def classify(self, images, cats):
         output = [None] * len(images)
-        matches = [None] * len(images)
         confs = [0.0] * len(images)
         for subcat in set(cats):
             idxs = [i for i, c in enumerate(cats) if c == subcat]
@@ -48,15 +44,11 @@ class CnnClassifier:
                 logits = self.child_models[subcat](batch)
                 softm = F.softmax(logits, dim=1).cpu()
             sub_preds = logits.argmax(1).cpu().tolist()
-            idx2card, idx2img = self.child_maps[subcat]
             for local_i, (i, p) in enumerate(zip(idxs, sub_preds)):
-                output[i] = idx2card[p]
-                matches[i] = idx2img[p]
+                output[i] = self.child_maps[subcat][p]
                 confs[i] = float(softm[local_i, p])
         filtered_output = []
-        filtered_matches = []
-        for o, m, c in zip(output, matches, confs):
+        for o, c in zip(output, confs):
             if c >= self.conf_threshold:
                 filtered_output.append(o)
-                filtered_matches.append(m)
-        return filtered_output, filtered_matches
+        return filtered_output

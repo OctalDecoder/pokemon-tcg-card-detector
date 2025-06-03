@@ -16,7 +16,8 @@
 - [x] Move global variables into `config.yaml`
 - [x] Unify mappings for CNN into a single file
 - [x] Move all images into a database with all the webscraped data
-- [ ] Remove URLs from CNN mappings
+- [x] Remove URLs from CNN mappings
+- [ ] Create DB table for each subcategory
 - [ ] Update database types, currently all `string`
 - [x] ~~Combine yolo.yaml into config.yaml` (if possible)~~ (its more maintainable this way :c)
 - [x] Refactor `prototype.py` into separate classes:
