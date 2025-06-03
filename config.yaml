@@ -30,7 +30,6 @@ screenshot_pipeline:
   save_results: True
   grid_cols: 5
   middle_space: 20
-  font_path: null
 
 # --------- YOLO -----------------------------------------------------------------------------------------
 yolo:

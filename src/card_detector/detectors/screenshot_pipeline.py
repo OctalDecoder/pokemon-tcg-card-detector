@@ -1,16 +1,22 @@
 import os
 import math
-import glob
 import time
+from typing import List, Tuple, Dict, Optional
 import numpy as np
-from PIL import Image, ImageDraw, ImageFont
 from functools import lru_cache
+from pathlib import Path
+from PIL import Image
 
 from card_detector.database.database import CardDB
 from card_detector.cnn.classifier import CnnClassifier
 from card_detector.yolo.detector import YoloDetector
 
-def merge_overlapping_boxes(boxes, iou_thresh=0.3):
+
+def merge_overlapping_boxes(
+    boxes: List[Tuple[float, float, float, float, float, float, int]],
+    iou_thresh: float = 0.3
+) -> List[Tuple[float, float, float, float, float, float, int]]:
+    """Merge boxes that overlap above an IoU threshold and belong to the same category."""
     def iou(b1, b2):
         x1 = max(b1[0], b2[0])
         y1 = max(b1[1], b2[1])
@@ -47,8 +53,15 @@ def merge_overlapping_boxes(boxes, iou_thresh=0.3):
         merged.append((nx1, ny1, nx2, ny2, ncx, ncy, ncat))
     return merged
 
+
 class ScreenshotPipeline:
-    def __init__(self, yolo_cfg, cnn_cfg, pcfg, logger=None):
+    """Pipeline for detecting, classifying, and visualizing card detections in screenshots."""
+
+    THUMB_SIZE: Tuple[int, int] = (184, 256)  # Default thumbnail size (w, h)
+    OUTPUT_SUBDIR: str = "screenshot_pipeline"
+    FALLBACK_COLOR: Tuple[int, int, int] = (80, 80, 80)  # Fallback color for missing images
+
+    def __init__(self, yolo_cfg: dict, cnn_cfg: dict, pcfg: dict, logger: Optional[object] = None):
         import torch
         self.pcfg = pcfg
         self.logger = logger
@@ -67,47 +80,71 @@ class ScreenshotPipeline:
             device=self.device
         )
         self.card_db = CardDB(pcfg["database"])
-        # Font
-        self.font = None
-        if pcfg.get("font_path") and os.path.exists(pcfg["font_path"]):
-            self.font = ImageFont.truetype(pcfg["font_path"], 12)
-            
-    def get_db_thumb(self, series_id, card_id):
+
+    lru_cache(maxsize=256)
+    def get_db_thumb(self, series_id: str, card_id: str) -> Image.Image:
+        """Fetches and resizes card image from the DB. Returns fallback if missing."""
         img = self.card_db.get_image_blob_by_seriesid_id(series_id, card_id)
         if img:
-            return img.convert('RGB')
+            return img.convert('RGB').resize(self.THUMB_SIZE, Image.LANCZOS)
         else:
-            # fallback image if missing
             print(f"Failed to fetch image for: {series_id} {card_id}")
-            return Image.new('RGB', (32, 45), (80, 80, 80))
+            return Image.new('RGB', self.THUMB_SIZE, self.FALLBACK_COLOR)
 
-    def process_images(self, screenshot_dir=None, save_results_images=None, logging=True):
+    def process_images(
+        self,
+        screenshot_dir: Optional[str] = None,
+        save_results_images: Optional[bool] = None,
+        logging: bool = True
+    ) -> Dict[str, List[str]]:
+        """
+        Process screenshots: detects cards, classifies them, and (optionally) saves result images.
+
+        Returns:
+            Dictionary mapping screenshot filenames to list of detected card IDs (as strings).
+        """
         pcfg = self.pcfg
         screenshot_dir = screenshot_dir or pcfg["screenshot_dir"]
         save_results_images = save_results_images if save_results_images is not None else pcfg["save_results"]
-        output_dir = pcfg["output_dir"] + "/screenshot_pipeline"
-        
+        output_dir = os.path.join(pcfg["output_dir"], self.OUTPUT_SUBDIR)
+
         # Clean output dir
         if save_results_images:
             os.makedirs(output_dir, exist_ok=True)
-            for f in glob.glob(os.path.join(output_dir, '*')):
-                if f.lower().endswith(('.png', '.jpg')):
-                    os.remove(f)
+            for f in Path(output_dir).glob("*"):
+                if f.suffix.lower() in (".png", ".jpg"):
+                    try:
+                        f.unlink()
+                    except Exception as e:
+                        print(f"Could not delete file {f}: {e}")
+
         # Prepare screenshots
-        shots = sorted(sum([glob.glob(os.path.join(screenshot_dir, f'*.{ext}')) for ext in ('png', 'jpg')], []))
-        detections = {}
+        shots = sorted(Path(screenshot_dir).glob("*.png")) + sorted(Path(screenshot_dir).glob("*.jpg"))
+        detections: Dict[str, List[str]] = {}
 
         all0 = time.time()
         for sp in shots:
-            bp = os.path.basename(sp)
+            bp = sp.name
             tt0 = time.time()
-            orig = Image.open(sp).convert('RGB')
+            try:
+                with Image.open(sp) as orig_img:
+                    orig = orig_img.convert('RGB')
+            except Exception as e:
+                print(f"Failed to open image {sp}: {e}")
+                continue
+
             arr = np.array(orig)
 
             # Detection
-            bboxes = self.yolo.detect(arr)
+            try:
+                bboxes = self.yolo.detect(arr)
+            except Exception as e:
+                print(f"Detection failed for {bp}: {e}")
+                continue
+
             if not bboxes:
                 continue
+
             bboxes = merge_overlapping_boxes(bboxes, iou_thresh=pcfg["bbox_iou_thresh"])
             heights = [y2 - y1 for x1, y1, x2, y2, *rest in bboxes]
             row_h = np.median(heights)
@@ -117,8 +154,14 @@ class ScreenshotPipeline:
             )
             crops = [orig.crop(tuple(map(int, b[:4]))) for b in sorted_boxes]
             cats = [b[6] for b in sorted_boxes]
-            output = self.cnn.classify(crops, cats)
-            detections[bp] = [f"{s} - {self.card_db.get_name_by_seriesid_id(*s.split(" "))}" for s in output]
+
+            try:
+                output = self.cnn.classify(crops, cats)
+            except Exception as e:
+                print(f"CNN classification failed for {bp}: {e}")
+                continue
+
+            detections[bp] = [f"{s} - {self.card_db.get_name_by_seriesid_id(*s.split(' '))}" for s in output]
 
             # Save results image
             if output and save_results_images:
@@ -128,16 +171,15 @@ class ScreenshotPipeline:
                 first_thumb = next((m for m in output if m), None)
                 if first_thumb is None:
                     continue
-                tw, th = (184, 256) # Set output size for images
+
+                tw, th = self.THUMB_SIZE
                 right = Image.new('RGB', (cols * tw, rows * th), (0, 0, 0))
-                draw = ImageDraw.Draw(right)
                 for i, m in enumerate(output):
                     if m:
-                        thumb = self.get_db_thumb(*m.split(" ")).resize((tw, th), Image.LANCZOS)
+                        thumb = self.get_db_thumb(*m.split(" "))
                         r, c = divmod(i, cols)
                         right.paste(thumb, (c * tw, r * th))
-                        if self.font:
-                            draw.text((c * tw + 2, r * th + 2), os.path.basename(m), font=self.font, fill=(255, 255, 255))
+
                 left_h = rows * th
                 w0, h0 = orig.size
                 left_w = int(w0 / h0 * left_h)
@@ -146,7 +188,11 @@ class ScreenshotPipeline:
                 combined.paste(left, (0, 0))
                 combined.paste(right, (left_w + pcfg["middle_space"], 0))
                 out_path = os.path.join(output_dir, bp)
-                combined.save(out_path)
+                try:
+                    combined.save(out_path)
+                except Exception as e:
+                    print(f"Failed to save combined image {out_path}: {e}")
+
             if logging and self.logger:
                 self.logger.info(f"{bp:.25s} processed")
         allt = time.time() - all0
