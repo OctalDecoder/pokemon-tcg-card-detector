@@ -16,19 +16,49 @@ FIELDS_TO_USE = [
     "Weakness", "Retreat", "Illustrator", "Flavor Text", "Pack", "Series"
 ]
 
+FIELD_TYPE_MAP = {
+    "SeriesID": str,
+    "ID": int,
+    "Name": str,
+    "Rarity": str,
+    "EX": bool,
+    "Shiny": bool,
+    "Type": str,
+    "HP": int,
+    "Card Type": str,
+    "Card Sub Type": str,
+    "Evolves From": str,
+    "Ability Name": str,
+    "Ability Info": str,
+    "Move 1 Name": str,
+    "Move 1 Cost": str,
+    "Move 1 Power": int,
+    "Move 1 Info": str,
+    "Move 2 Name": str,
+    "Move 2 Cost": str,
+    "Move 2 Power": int,
+    "Move 2 Info": str,
+    "Weakness": str,
+    "Retreat": int,
+    "Illustrator": str,
+    "Flavor Text": str,
+    "Pack": str,
+    "Series": str,
+}
+
 def create_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute('''
     CREATE TABLE IF NOT EXISTS cards (
         series_id TEXT,
-        id TEXT,
+        id INT,
         name TEXT,
         rarity TEXT,
-        ex TEXT,
-        shiny TEXT,
+        ex BOOL,
+        shiny BOOL,
         type TEXT,
-        hp TEXT,
+        hp INT,
         card_type TEXT,
         card_sub_type TEXT,
         evolves_from TEXT,
@@ -43,7 +73,7 @@ def create_db():
         move2_power TEXT,
         move2_info TEXT,
         weakness TEXT,
-        retreat TEXT,
+        retreat INT,
         illustrator TEXT,
         flavor_text TEXT,
         pack TEXT,
@@ -54,6 +84,27 @@ def create_db():
     ''')
     conn.commit()
     conn.close()
+    
+def parse_value(val, target_type):
+    # Treat empty string and "-" as NULL/None
+    if val in ("", "-", None):
+        return None
+    # Convert to proper type
+    if target_type is int:
+        try:
+            return int(val)
+        except ValueError:
+            return None
+    elif target_type is bool:
+        # Accept "True", "true", "1", "yes" etc as True; "False" etc as False
+        if str(val).strip().lower() in ("1", "true", "yes", "y"):
+            return True
+        elif str(val).strip().lower() in ("0", "false", "no", "n"):
+            return False
+        return None
+    elif target_type is str:
+        return str(val)
+    return val
 
 def download_and_pack(row):
     try:
@@ -66,7 +117,10 @@ def download_and_pack(row):
             img.save(buf, format='png')
             image_blob = buf.getvalue()
         # Tuple must match number of columns in DB table
-        data = tuple(row.get(field, "") for field in FIELDS_TO_USE) + (image_blob,)
+        data = tuple(
+            parse_value(row.get(field, ""), FIELD_TYPE_MAP[field])
+            for field in FIELDS_TO_USE
+        ) + (image_blob,)
         if len(data) != 28:
             print(f"Skipping row {row.get('Name')} due to wrong column count: {len(data)}")
             return None

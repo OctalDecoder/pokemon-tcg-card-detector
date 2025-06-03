@@ -18,7 +18,7 @@
 - [x] Move all images into a database with all the webscraped data
 - [x] Remove URLs from CNN mappings
 - [ ] Create DB table for each subcategory
-- [ ] Update database types, currently all `string`
+- [x] Update database types, currently all `string`
 - [x] ~~Combine yolo.yaml into config.yaml` (if possible)~~ (its more maintainable this way :c)
 - [x] Refactor `prototype.py` into separate classes:
   - [x] **YOLO** logic
@@ -105,8 +105,13 @@ In essence, this project unifies state-of-the-art object detection and tracking 
    - All temporary model checkpoints, embeddings, and other intermediate files live here.
 
 3. **Shared config behavior**
+
    - A `shared_config.yaml` is loaded by each sub-config.
    - Shared values have lower priority and will **not** override values defined in individual config files (e.g., `yolo.yaml`, `cnn.yaml`).
+
+4. **Database setup**
+   - Download database from [TBD](#TBD)
+   - Place database in `models/cards.db` (configurable in `config.yaml`)
 
 ### WIP NOTES
 
