@@ -1,4 +1,3 @@
-# setup.py
 from setuptools import setup, find_packages
 
 setup(
@@ -8,14 +7,18 @@ setup(
     package_dir={"": "src"},
     packages=find_packages(where="src"),
     install_requires=[
-        "opencv-python",
-        "torch",
-        "ultralytics",
         "pyyaml",
+        "Pillow",
+        "numpy",
+        "torch",
+        "torchvision",
+        "albumentations",
+        "ultralytics",
     ],
     entry_points={
         "console_scripts": [
             "card-detector=card_detector.__main__:main",
+            "train-cnn=card_detector.cnn.train:main",
         ],
     },
 )

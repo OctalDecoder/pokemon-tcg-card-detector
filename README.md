@@ -1,13 +1,46 @@
 ## Table of Contents
 
-- [Project Summary](#project-summary)
-- [Repository Setup Guide (WIP)](#repository-setup-guide-wip)
 - [General TODO](#general-todo)
+- [Project Summary](#project-summary)
+- [Repository Setup Guide (WIP)](#-repository-setup-guide)
 - [Real Time Processing Research Suggestions](#real-time-processing-reasearch-suggestions)
   - [YOLOv8 Tracking + pHash Filtering](#yolov8-tracking--phash-filtering)
   - [Pruning, Quantization & Distillation](#pruning-quantization--distillation)
   - [Asynchronous Pipeline & GPU Pipelines](#asynchronous-pipeline--gpu-pipelines)
   - [Extra Notes](#extra-notes)
+
+---
+
+## General TODO
+
+- [x] Move global variables into `config.yaml`
+- [x] Unify mappings for CNN into a single file
+- [x] Move all images into a database with all the webscraped data
+- [x] Remove URLs from CNN mappings
+- [ ] Create DB table for each subcategory
+- [x] Update database types, currently all `string`
+- [x] ~~Combine yolo.yaml into config.yaml` (if possible)~~ (its more maintainable this way :c)
+- [x] Refactor `prototype.py` into separate classes:
+  - [x] **YOLO** logic
+  - [x] **CNN** logic
+- [x] Complete `Makefile` (build, test, CLI shortcuts)
+- [ ] Write and run tests for:
+  - [ ] `cnn/` modules
+  - [ ] `yolo/` modules
+  - [ ] `train/` scripts
+  - [ ] `generate_data/` scripts
+- [ ] Get all tests passing (fix thresholds, edge cases, etc.)
+- [ ] Create `requirements.txt` (pin dependencies)
+- [ ] Verify `setup.py` is production-ready
+- [ ] Implement detection classes:
+  - [ ] **ImageDetection** (single images)
+  - [ ] **VideoDetection** (frame-by-frame)
+- [ ] Evaluate moving to mobile-capable student models (e.g., TinyML-friendly architectures)
+- [ ] Investigate impact of using the current model with cards its never seen or trained on (no CNN classification)
+- [ ] Test integration of new cards from the latest expansion pack
+- [ ] (Optional) Add CI/CD workflows (e.g., GitHub Actions)
+- [ ] Finalize README so it's a true "README" rather than a living to-do list
+- [ ] SLEEP 😴
 
 ---
 
@@ -60,48 +93,127 @@ In essence, this project unifies state-of-the-art object detection and tracking 
 
 ---
 
-## Repository Setup Guide (WIP)
+# 📁 Repository Setup Guide
 
-1. **Add screenshots to `tests/fixtures`**
-
-   - Place any sample images or screenshots needed for unit tests in this directory.
-   - `tests/fixtures` is also the main location where screenshot pipelines pull from during execution → configurable in `config.yaml` → `prototype` → `screenshot_dir`.
-
-2. **Intermediate model data is stored in `data/`**
-
-   - All temporary model checkpoints, embeddings, and other intermediate files live here.
-
-3. **Shared config behavior**
-   - A `shared_config.yaml` is loaded by each sub-config.
-   - Shared values have lower priority and will **not** override values defined in individual config files (e.g., `yolo.yaml`, `cnn.yaml`).
+> **This guide describes how to configure, structure, and use this repo.** > _WIP: Feedback and edits welcome!_
 
 ---
 
-## General TODO
+## 1. Prerequisites
 
-- [ ] Move global variables into `config.yaml`
-- [ ] Combine `yolo.yaml` into `config.yaml` (if possible)
-- [x] Refactor `prototype.py` into separate classes:
-  - [x] **YOLO** logic
-  - [x] **CNN** logic
-- [x] Complete `Makefile` (build, test, CLI shortcuts)
-- [ ] Write and run tests for:
-  - [ ] `cnn/` modules
-  - [ ] `yolo/` modules
-  - [ ] `train/` scripts
-  - [ ] `generate_data/` scripts
-- [ ] Get all tests passing (fix thresholds, edge cases, etc.)
-- [ ] Create `requirements.txt` (pin dependencies)
-- [ ] Verify `setup.py` is production-ready
-- [ ] Implement detection classes:
-  - [ ] **ImageDetection** (single images)
-  - [ ] **VideoDetection** (frame-by-frame)
-- [ ] Evaluate moving to mobile-capable student models (e.g., TinyML-friendly architectures)
-- [ ] Investigate impact of using the current model with cards its never seen or trained on (no CNN classification)
-- [ ] Test integration of new cards from the latest expansion pack
-- [ ] (Optional) Add CI/CD workflows (e.g., GitHub Actions)
-- [ ] Finalize README so it’s a true “README” rather than a living to-do list
-- [ ] SLEEP 😴
+- Python ≥ 3.12
+- [pip](https://pip.pypa.io/en/stable/) (latest recommended)
+- `git` (for cloning, version control)
+
+---
+
+## 2. Installation
+
+```bash
+# Clone the repository
+git clone https://gitlab.com/OctalDecoder/pokemon-tcg-pocket-card-detection.git
+cd Pokemon\ TCG\ Pocket\ Card\ Detection/
+
+# Install the requirements
+pip install -e .
+```
+
+---
+
+## 3. Screenshots for Testing
+
+- Place images to be processed in:
+  `tests/fixtures/`
+- **To change this location:**
+  Edit `config.yaml` → `shared` → `screenshot_dir`.
+
+---
+
+## 4. Data & Intermediate Model Files
+
+- High-resolution TCG card images live in:
+  `data/raw/cards/`
+- All temporary checkpoints, embeddings, and intermediate files are created in:
+  `data/`
+
+---
+
+## 5. Database Setup
+
+- **Download or obtain** the database (`cards.db`) from \[TBD download link or instructions].
+- Place it in:
+  `models/cards.db`
+- **To change this location:**
+  Edit `config.yaml` → `shared` → `database`
+
+---
+
+## 6. Configuration Structure
+
+- The main configuration file is `config.yaml`.
+- The `shared` section merges into all other config sections:
+
+  - _Best practice_: Use `shared` for common variables.
+  - **Override priority:**
+
+    - `shared` values are populated into all other sections. These individual config sections (e.g., `yolo`, `cnn`) take precedence over `shared` for conflicting values.
+
+---
+
+## 7. Card Image Directory & Naming Convention
+
+- **Base directory:**
+  Controlled by `config.yaml` → `shared` → `card_images_dir`
+- **Class subfolders:**
+  Must match names in `config.yaml` → `shared` → `classifiers` (e.g., `fullart`, `standard`)
+- **File naming:**
+  Place images inside the relevant classifier subfolder, named as `[SeriesID] [CardID].png`
+
+**Example** (for `card_images_dir: data/raw/cards`, `classifiers: fullart, standard`):
+
+```
+data/raw/cards/standard/A2b 32.png
+data/raw/cards/fullart/S5 100.png
+```
+
+---
+
+## 8. Output Directories
+
+- By default, processed images, results, and generated data will be written to:
+
+  - Output dir specified in `config.yaml` → `shared` → `output_dir`
+
+- Subdirectories (e.g., `output/screenshot_pipeline/`) are automatically created as needed.
+
+---
+
+## 9. Running the Pipeline
+
+To process screenshots and generate results:
+
+```bash
+card-detector
+```
+
+---
+
+## 10. Work-in-Progress Notes
+
+- Documentation is evolving; structure and locations may shift.
+- Database download location is **TBD**.
+- Please keep `config.yaml` and directory structure updated if you move or rename files.
+
+---
+
+## ⚠️ Quick Reference
+
+| Purpose                   | Path              | Config Key               |
+| ------------------------- | ----------------- | ------------------------ |
+| Test images (screenshots) | `tests/fixtures/` | `shared.screenshot_dir`  |
+| Raw card images           | `data/raw/cards/` | `shared.card_images_dir` |
+| Database file             | `models/cards.db` | `shared.database`        |
+| Output/results            | `output/`         | `shared.output_dir`      |
 
 ---
 
