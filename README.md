@@ -30,15 +30,15 @@
   - [ ] `train/` scripts
   - [ ] `generate_data/` scripts
 - [ ] Get all tests passing (fix thresholds, edge cases, etc.)
-- [ ] Create `requirements.txt` (pin dependencies)
-- [ ] Verify `setup.py` is production-ready
+- [x] ~~Create requirements.txt (pin dependencies)~~ (now in `pyproject.toml`)
+- [x] ~~Verify setup.py is production-ready~~ (now in `pyproject.toml`)
 - [ ] Implement detection classes:
   - [ ] **ImageDetection** (single images)
   - [ ] **VideoDetection** (frame-by-frame)
 - [ ] Evaluate moving to mobile-capable student models (e.g., TinyML-friendly architectures)
 - [ ] Investigate impact of using the current model with cards its never seen or trained on (no CNN classification)
 - [ ] Test integration of new cards from the latest expansion pack
-- [ ] (Optional) Add CI/CD workflows (e.g., GitHub Actions)
+- [ ] Add CI/CD workflows
 - [ ] Finalize README so it's a true "README" rather than a living to-do list
 - [ ] SLEEP 😴
 
