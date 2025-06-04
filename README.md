@@ -72,9 +72,11 @@ The workflow is fully asynchronous and optimized for speed, accuracy, and scalab
 - Screenshots are pulled from `screenshot_dir` and videos from `videos_dir` (configurable in `config.yaml`).
 - Asynchronous pipeline ensures frame acquisition never blocks processing.
 
-_Example: Pack Opening Screenshot_ <img src="assets/2.jpg" width="300">
+_Example: Pack Opening Screenshot_
+<img src="assets/2.jpg" width="300">
 
-_Example: Pack Opening Video Demo_ <img src="assets/card_opening.gif" width="300">
+_Example: Pack Opening Video Demo_
+<img src="assets/card_opening.gif" width="300">
 
 ---
 
@@ -83,7 +85,8 @@ _Example: Pack Opening Video Demo_ <img src="assets/card_opening.gif" width="300
 - YOLOv8 identifies cards in each frame, outputting bounding boxes, scores, and class labels (“fullart” vs. “standard”).
 - Integrated ByteTrack/SORT assigns persistent `track_id`s for robust tracking. _(TODO)_
 
-_Example: Pack Summary Screenshot_ <img src="assets/3.png" width="800">
+_Example: Pack Summary Screenshot_
+<img src="assets/3.png" width="800">
 
 _Example: Dex Scrolling Video Demo_
 <img src="assets/dex_scrolling.gif" width="220">
@@ -132,9 +135,11 @@ _Example: Dex Scrolling Video Demo_
 
 ### 📷 Other Visual Examples
 
-_Battle Screenshot_ <img src="assets/5.jpg" width="800">
+_Battle Screenshot_
+<img src="assets/5.jpg" width="800">
 
-_Card Dex Screenshot_ <img src="assets/4.png" width="800">
+_Card Dex Screenshot_
+<img src="assets/4.png" width="800">
 
 ---
 
@@ -145,7 +150,6 @@ _Card Dex Screenshot_ <img src="assets/4.png" width="800">
 ### 1. Prerequisites
 
 - Python ≥ 3.12
-- [pip](https://pip.pypa.io/en/stable/) (latest recommended)
 - `git` (for cloning, version control)
 
 ---
@@ -155,7 +159,7 @@ _Card Dex Screenshot_ <img src="assets/4.png" width="800">
 ```bash
 # Clone the repository
 git clone https://gitlab.com/OctalDecoder/pokemon-tcg-pocket-card-detection.git
-cd Pokemon\ TCG\ Pocket\ Card\ Detection/
+cd pokemon-tcg-pocket-card-detection
 
 # Install the requirements
 pip install -e .
