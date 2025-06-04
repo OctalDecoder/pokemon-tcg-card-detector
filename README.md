@@ -4,11 +4,12 @@
 
 ## 📋 Table of Contents
 
-- [🛠️ General TODO](#️-general-todo)
-- [🚀 Project Summary](#-project-summary)
-- [📸 Overview & Examples](#-overview--examples)
-- [📁 Repository Setup Guide (WIP)](#-repository-setup-guide-wip)
-- [🧪 Real Time Processing Research Suggestions](#-real-time-processing-research-suggestions)
+- [General TODO](#️-general-todo)
+- [Project Summary](#-project-summary)
+- [Overview & Examples](#-overview--examples)
+- [Repository Setup Guide (WIP)](#-repository-setup-guide-wip)
+- [Real Time Processing Research Suggestions](#-real-time-processing-research-suggestions)
+- [Extra Notes](#-extra-notes)
 
 ---
 
@@ -40,10 +41,9 @@
 - [x] ~~Create requirements.txt~~ (now in `pyproject.toml`)
 - [x] ~~Verify setup.py is production-ready~~ (now in `pyproject.toml`)
 - [x] Implement detection classes:
-
   - [x] **ImageDetection** (single images)
   - [x] **VideoDetection** (frame-by-frame)
-
+- [ ] Reduce size of `.gif` and `.png` in `assets/`
 - [ ] Extend video detection to handle images in a folder as the input stream
 - [ ] Evaluate moving to mobile-capable student models (TinyML-friendly)
 - [ ] Investigate using the model on cards it’s never seen or trained on (no CNN classification)
@@ -85,7 +85,8 @@ _Example: Pack Opening Video Demo_ <img src="assets/card_opening.gif" width="300
 
 _Example: Pack Summary Screenshot_ <img src="assets/3.png" width="800">
 
-_Example: Dex Scrolling Video Demo_ <img src="assets/dex_scrolling.gif" width="220">
+_Example: Dex Scrolling Video Demo_
+<img src="assets/dex_scrolling.gif" width="220">
 
 ---
 
@@ -367,7 +368,59 @@ card-detector
      - After inference, update per-track cache and global hashtable with `(hash → label, confidence, last_seen_frame)`.
      - Return labels to the main thread to overlay on the display or write out results.
 
-- **Asynchronous I/O & Pipelining**
+Asynchronous I/O & Pipelining
 
-  - While **Stream #1** (YOLO) is processing Frame N, **Stream #2** (CNN) should be classifying crops from Frame N−1.
-  - Use CUDA events or Python’s
+- While **Stream #1** (YOLO) is processing Frame N, **Stream #2** (CNN) should be classifying crops from Frame N−1.
+- Use CUDA events or Python’s `torch.cuda.Stream` to overlap YOLO’s detection+tracking with the classification stage. This can hide ~10–20 ms of CNN work behind another detected frame.
+- On the CPU side, maintain thread-safe queues for:
+  1. **Detection outputs** (bboxes + track_ids + hashes that need CNN).
+  2. **Ready labels** (to be rendered or written to disk).
+- Ensure the crop extraction and `pHash` computation run on a separate CPU worker thread pool so they don’t block the main detection loop.
+
+**Buffer Sizing & Backpressure**
+
+- If classification lags behind detection (e.g., many new cards appear suddenly), implement a **max buffer size** (e.g., 64 crops). If the queue fills, either drop low-confidence detections or throttle YOLO (rare).
+- Optionally, dynamically adjust crop size or student selection when queue length > threshold: e.g., temporarily switch to a “tiny” student model or lower input resolution for faster catch-up.
+
+**Error Handling**
+
+- If a classification batch fails (e.g., OOM), catch the exception, reduce batch size by half, and retry. Log the failure with `logging.error` so we can profile memory constraints.
+
+---
+
+### 📝 Extra Notes
+
+#### 👻 Ghost Cards & False Positives
+
+- **Confirmation rule:**  
+  Only add a new track to the active dictionary **after** it’s persisted for 2–3 consecutive frames OR its CNN confidence > 0.8.  
+  If YOLO produces a one-off box with no follow-ups, ignore it (keep it in a “pending” buffer) to avoid caching spurious labels.
+
+#### 🔄 Adaptive CNN Invocation
+
+- If a **cached track’s CNN confidence drops below 0.5**, force a fresh classification in the next available batch even if `pHash` matches.  
+  This catches cards whose visual appearance changed (e.g., glare, damage, rotated).
+
+#### 🧠 Memory Management for Cache
+
+- **Use an LRU with capacity = 256** entries, keyed by `pHash` (or 128-D embedding).
+- Each entry stores: `(label, last_seen_frame, confidence)`.
+- Evict the least recently used when inserting a new hash beyond capacity.
+- Optionally, keep a separate `track_id → hash` map so that when a track ends, we can quickly retire it or deprioritize its hash (though we can still allow the global hash to persist until LRU eviction).
+
+#### 🕵️ Profiling to Identify True Bottlenecks
+
+- **NVIDIA Nsight Systems / PyTorch Profiler**
+  - Instrument the YOLO inference step, `pHash` function, crop extraction, and batched CNN inference.
+  - Identify if CPU→GPU memcpy is dominating. If so, preallocate a pinned (page-locked) buffer for crop tensors and use `torch.cuda.memcpy_async` to overlap with GPU compute.
+  - Measure how many milliseconds each stage takes on average. Example breakdown:
+    - YOLO detection + tracking: ~10 ms
+    - Crop extraction (CPU): ~5 ms for 30 crops
+    - `pHash` (CPU): ~1 ms per crop (~30 ms total)
+    - Batched CNN (GPU): ~60 ms for 20 crops at 128×128 (fp16 student)
+    - Overhead (queue/dispatch): ~5 ms
+  - If the sum > 100 ms, see which stage is the worst offender and tune accordingly (e.g., batch smaller, prune more, or reduce crop resolution).
+
+---
+
+By combining **tracking + pHash caching**, **pruned+quantized distilled CNNs**, and an **asynchronous pipelined architecture**, we’ll minimize redundant CNN inferences, squeeze maximum throughput out of the GPU, and aim to keep peak frame time under ~100 ms even when dozens of cards appear simultaneously.
