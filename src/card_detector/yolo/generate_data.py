@@ -1,3 +1,8 @@
+"""yolo/generate_data.py
+
+Utility script for generating the data used to train the YOLOv8 model.
+"""
+
 import os
 import glob
 import random

@@ -1,3 +1,25 @@
+"""
+card_database.py
+
+SQLite-backed CardDB class for retrieving card metadata and images.
+
+Classes:
+    CardDB: Manages a connection to a SQLite cards database, providing methods to:
+        - get_name_by_seriesid_id(series_id, id_): Return the card name.
+        - get_image_blob_by_seriesid_id(series_id, id_): Return a PIL Image from stored BLOB.
+        - close(): Close the database connection.
+
+Usage Example:
+    from card_detector.database.card_database import CardDB
+
+    db = CardDB(db_path="models/cards.db", check_same_thread=False)
+    name = db.get_name_by_seriesid_id("XY-001", "1")
+    image = db.get_image_blob_by_seriesid_id("XY-001", "1")
+    if image:
+        image.show()
+    db.close()
+"""
+
 import sqlite3
 from io import BytesIO
 from PIL import Image

@@ -1,8 +1,8 @@
-"""
-cnn_master_and_distill.py  (auto-detects sub-categories)
-Train an EfficientNet-B0 "master" model, then distill MobileNetV3-Small "students" for each subfolder.
+"""cnn/train.py
+Utility script to train an EfficientNet-B0 "master" model, then distill 
+MobileNetV3-Small "students"
 
-Output:
+Outputs:
 master_cnn
 student_cnn (one per config.yaml -> classifiers)
 mappings.json

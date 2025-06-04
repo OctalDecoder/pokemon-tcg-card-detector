@@ -1,3 +1,8 @@
+"""yolo/generate_data.py
+
+Utility script for generating the data used to train the CNN models.
+"""
+
 import os
 import glob
 import shutil

@@ -1,3 +1,8 @@
+"""yolo/train.py
+
+Utility script for training a YOLOv8 model
+"""
+
 import multiprocessing
 from ultralytics import YOLO
 from card_detector.config import cfg

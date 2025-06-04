@@ -27,8 +27,10 @@
 - [ ] Write and run tests for:
   - [ ] `cnn/` modules
   - [ ] `yolo/` modules
-  - [ ] `train/` scripts
-  - [ ] `generate_data/` scripts
+  - [ ] `screenshot_pipeline.py`
+  - [ ] `video_pipeline.py`
+  - [ ] ~~`train/` scripts~~
+  - [ ] ~~`generate_data/` scripts~~
 - [ ] Get all tests passing (fix thresholds, edge cases, etc.)
 - [x] ~~Create requirements.txt (pin dependencies)~~ (now in `pyproject.toml`)
 - [x] ~~Verify setup.py is production-ready~~ (now in `pyproject.toml`)

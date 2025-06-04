@@ -1,3 +1,8 @@
+"""video_overlay.py
+
+Utility functions for drawing real-time overlays on video frames.
+"""
+
 import cv2
 
 def draw_box_with_text(

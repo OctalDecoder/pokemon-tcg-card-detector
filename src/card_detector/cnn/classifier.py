@@ -1,4 +1,32 @@
-# detectors/cnn_classifier.py
+"""
+cnn_classifier.py
+
+CNN-based classifier for per-category card recognition.
+
+Classes:
+    CnnClassifier:
+        - __init__(subcats, cnn_model_dir, conf_threshold=0.15, device='cuda'):
+            Initialize with a list of subcategories, load mapping JSON and MobileNetV3 models 
+            from `cnn_model_dir`, and set confidence threshold and device.
+        - _load_models(cnn_model_dir):
+            Load `cnn_mappings.json`, convert keys to int, instantiate and load each MobileNetV3 
+            checkpoint (cnn_<subcat>_student.pth), and store models and label maps.
+        - classify(images, cats):
+            Given a list of PIL images and corresponding YOLO category IDs, batch-transform 
+            by subcategory, run through the appropriate MobileNetV3 model, apply softmax, 
+            filter by `conf_threshold`, and return a list of high-confidence card IDs.
+
+Usage Example:
+    from card_detector.cnn.classifier import CnnClassifier
+
+    subcategories = [1, 2, 3]
+    cnn_dir = "models/cnn"
+    classifier = CnnClassifier(subcategories, cnn_model_dir=cnn_dir, conf_threshold=0.2, device="cuda")
+
+    # images: list of PIL.Image crops, cats: matching list of subcategory IDs
+    labels = classifier.classify(images, cats)
+"""
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F

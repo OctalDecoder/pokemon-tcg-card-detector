@@ -1,10 +1,32 @@
-"""Real-time video processing pipeline.
+"""
+video_pipeline.py
 
-This module implements a simple frame-by-frame pipeline similar to
-`screenshot_pipeline` but designed for video input. Each frame is
-processed by YOLO to obtain bounding boxes which are queued for CNN
-classification. While the next frame is being prepared we attempt to
-empty the queue so the system can keep up with the target FPS.
+Real-time video processing pipeline for card detection.
+
+Classes:
+    VideoPipeline:
+        - __init__(yolo_cfg, cnn_cfg, pcfg, logger=None):
+            Initialize YOLO detector, CNN classifier, shared CardDB, and threading resources.
+        - _worker_loop():
+            Internal method to start the CropClassifierWorker loop in a separate thread.
+        - _draw_fps(frame):
+            Compute and overlay FPS estimate on the given frame.
+        - _draw_live_detections(frame):
+            Overlay recent card detections on the given frame.
+        - process_videos(video_dir=None, logging=True) -> Set[str]:
+            Process all `.mp4` files in `video_dir`. For each video:
+                • Read frames, run YOLO to get bounding boxes.
+                • Every Nth frame (based on target FPS), extract crops and enqueue for CNN classification.
+                • Overlay FPS and live detections if `display` or `save_results` is enabled.
+                • Optionally save annotated video to `output_dir`.
+            Returns a set of detected card IDs across all videos.
+
+Usage Example:
+    from card_detector.pipeline.video_pipeline import VideoPipeline
+    # yolo_cfg, cnn_cfg, pcfg = configs()
+    # my_logger = MyLogger()
+    pipeline = VideoPipeline(yolo_cfg, cnn_cfg, pcfg, logger=my_logger)
+    detected_cards = pipeline.process_videos()
 """
 
 from __future__ import annotations
@@ -75,7 +97,6 @@ class VideoPipeline:
             self.output_dir.mkdir(parents=True, exist_ok=True)
 
         self.det_time = 0.0
-        self.clf_time = 0.0
 
         self.stop_event = threading.Event()
 
@@ -245,6 +266,5 @@ class VideoPipeline:
         if self.logger and logging:
             self.logger.info(
                 f"Processed {len(videos)} videos in {total_time:.2f}s | "
-                f"det={self.det_time:.2f}s clf={self.clf_time:.2f}s"
+                f"det={self.det_time:.2f}s clf={self.worker.clf_time:.2f}s"
             )
-
