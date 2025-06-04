@@ -39,6 +39,7 @@ video_pipeline:
   target_fps: 5
   display: true
   cnn_batch_size: 8
+  save_results: True
 
 # --------- YOLO -----------------------------------------------------------------------------------------
 yolo:
