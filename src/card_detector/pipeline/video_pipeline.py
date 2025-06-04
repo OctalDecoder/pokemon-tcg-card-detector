@@ -12,7 +12,7 @@ from __future__ import annotations
 import time
 import threading
 import shutil
-from queue import Queue, Empty
+from queue import Queue
 from pathlib import Path
 from typing import Optional, Set, Tuple, List, Dict
 
@@ -23,6 +23,8 @@ from card_detector.database.database import CardDB
 from card_detector.cnn.classifier import CnnClassifier
 from card_detector.yolo.detector import YoloDetector
 from .screenshot_pipeline import merge_overlapping_boxes
+from card_detector.ui.video_overlay import draw_fps_overlay, draw_live_detections_overlay
+from card_detector.pipeline.video_worker import CropClassifierWorker
 
 
 class VideoPipeline:
@@ -88,45 +90,21 @@ class VideoPipeline:
         # Lock for live detection overlay, since detected in worker thread
         self._overlay_lock = threading.Lock()
 
-    # ------------------------------------------------------------------
-    def _classify_from_queue(self, budget: float = float("inf")) -> None:
-        """Process queued crops in batches within `budget` seconds."""
-
-        start = time.time()
-        while (time.time() - start) < budget and not self.queue.empty():
-            imgs: List[Image.Image] = []
-            cats: List[str] = []
-            for _ in range(min(self.batch_size, self.queue.qsize())):
-                try:
-                    crop, cat = self.queue.get_nowait()
-                except Empty:
-                    break
-                imgs.append(crop)
-                cats.append(cat)
-            if not imgs:
-                break
-            t0 = time.time()
-            labels = self.cnn.classify(imgs, cats)
-            self.clf_time += time.time() - t0
-            for card_id in labels:
-                if card_id not in self.seen_cards:
-                    self.seen_cards.add(card_id)
-                    name = self.card_db.get_name_by_seriesid_id(*card_id.split(" "))
-                    print(f"New card {card_id} {name} detected")
-                    # -- For overlay --
-                    display_str = f"{card_id} {name}" if name else card_id
-                    with self._overlay_lock:
-                        self._live_detections[card_id] = (display_str, time.time())
+        # Refactored worker for classification
+        self.worker = CropClassifierWorker(
+            queue=self.queue,
+            cnn=self.cnn,
+            card_db=self.card_db,
+            seen_cards=self.seen_cards,
+            overlay_lock=self._overlay_lock,
+            live_detections=self._live_detections,
+            batch_size=self.batch_size,
+            stop_event=self.stop_event,
+        )
 
     # ------------------------------------------------------------------
     def _worker_loop(self) -> None:
-        """Background thread for continuously processing the queue."""
-
-        while not self.stop_event.is_set() or not self.queue.empty():
-            if self.queue.empty():
-                time.sleep(0.01)
-                continue
-            self._classify_from_queue()
+        self.worker.loop()
 
     # ------------------------------------------------------------------
     def _draw_fps(self, frame):
@@ -136,37 +114,9 @@ class VideoPipeline:
             self._fps_times.pop(0)
         if len(self._fps_times) >= 2:
             fps_est = (len(self._fps_times) - 1) / (self._fps_times[-1] - self._fps_times[0])
-            fps_text = f"FPS: {fps_est:.1f}"
-            # Card style: top left
-            margin_x, margin_y = 20, 20
-            (text_width, text_height), baseline = cv2.getTextSize(
-                fps_text, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2
-            )
-            x = margin_x
-            y = margin_y + text_height
-            cv2.rectangle(
-                frame,
-                (x - 6, y - text_height - 4),
-                (x + text_width + 6, y + baseline + 4),
-                (30, 30, 30),  # dark background
-                thickness=-1
-            )
-            cv2.putText(
-                frame,
-                fps_text,
-                (x, y),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.7,
-                (255, 220, 120),
-                2,
-                cv2.LINE_AA
-            )
+            draw_fps_overlay(frame, fps_est)
 
     def _draw_live_detections(self, frame):
-        """
-        Draw live detected cards in top right, each for 2 seconds.
-        Cards stack vertically, each with its own timer.
-        """
         now = time.time()
         # Copy and clean-up old detections
         with self._overlay_lock:
@@ -174,37 +124,7 @@ class VideoPipeline:
             for cid in expired:
                 del self._live_detections[cid]
             live_items = list(self._live_detections.values())
-
-        if not live_items:
-            return
-
-        # Draw each, top right, vertically stacked
-        h, w = frame.shape[:2]
-        margin_x, margin_y = 20, 20
-        line_height = 28
-        for i, (display_str, detected_time) in enumerate(live_items):
-            y = margin_y + i * line_height
-            (text_width, text_height), baseline = cv2.getTextSize(
-                display_str, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2
-            )
-            x = w - margin_x - text_width
-            cv2.rectangle(
-                frame,
-                (x - 6, y - text_height - 4),
-                (x + text_width + 6, y + baseline + 4),
-                (30, 30, 30),  # dark background
-                thickness=-1
-            )
-            cv2.putText(
-                frame,
-                display_str,
-                (x, y),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.7,
-                (255, 220, 120),
-                2,
-                cv2.LINE_AA
-            )
+        draw_live_detections_overlay(frame, live_items)
 
     # ------------------------------------------------------------------
     def process_videos(
@@ -256,7 +176,6 @@ class VideoPipeline:
 
                 # Detection only on interval
                 run_detection = (frame_idx % interval == 0)
-
 
                 bboxes = self.yolo.detect(frame)
                 bboxes = merge_overlapping_boxes(
@@ -332,4 +251,3 @@ class VideoPipeline:
                 f"det={self.det_time:.2f}s clf={self.clf_time:.2f}s"
             )
 
-        return set()  # Return empty because seen_cards is now per-video

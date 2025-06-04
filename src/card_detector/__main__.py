@@ -2,8 +2,8 @@ def main():
     import argparse
     import logging
     from card_detector.config import cfg
-    from card_detector.detectors.screenshot_pipeline import ScreenshotPipeline
-    from card_detector.detectors.video_pipeline import VideoPipeline
+    from card_detector.pipeline.screenshot_pipeline import ScreenshotPipeline
+    from card_detector.pipeline.video_pipeline import VideoPipeline
 
     logging.basicConfig(
         format="%(asctime)s [%(levelname)s] %(message)s",
@@ -46,7 +46,8 @@ def main():
         pipeline = ScreenshotPipeline(yolo_cfg, cnn_cfg, pcfg, logger=logger)
         logger.info("Starting pipeline with batch classification...")
         results = pipeline.process_images()
-    logger.info(results)
+    if results is not None:
+        logger.info(results)
 
 
 if __name__ == "__main__":

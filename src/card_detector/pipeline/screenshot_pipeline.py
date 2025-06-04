@@ -1,3 +1,11 @@
+"""Screenshot processing pipeline.
+
+This module implements a simple screenshot card detection pipeline. Each screenshot is
+processed by YOLO to obtain bounding boxes. These bounding boxes are used to crop cards
+and pass into the CNN classifier. The CNN classifier then determines the card ID and uses
+it to gather information about the card from the sqllite database.
+"""
+
 import os
 import math
 import time
@@ -82,7 +90,7 @@ class ScreenshotPipeline:
         # Allow cross-thread access as classification may run in a worker
         self.card_db = CardDB(pcfg["database"], check_same_thread=False)
 
-    lru_cache(maxsize=256)
+    @lru_cache(maxsize=256)
     def get_db_thumb(self, series_id: str, card_id: str) -> Image.Image:
         """Fetches and resizes card image from the DB. Returns fallback if missing."""
         img = self.card_db.get_image_blob_by_seriesid_id(series_id, card_id)

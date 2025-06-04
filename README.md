@@ -32,9 +32,10 @@
 - [ ] Get all tests passing (fix thresholds, edge cases, etc.)
 - [x] ~~Create requirements.txt (pin dependencies)~~ (now in `pyproject.toml`)
 - [x] ~~Verify setup.py is production-ready~~ (now in `pyproject.toml`)
-- [ ] Implement detection classes:
-  - [ ] **ImageDetection** (single images)
-  - [ ] **VideoDetection** (frame-by-frame)
+- [x] Implement detection classes:
+  - [x] **ImageDetection** (single images)
+  - [x] **VideoDetection** (frame-by-frame)
+- [ ] Extend video detection to handle images in a file as the input stream
 - [ ] Evaluate moving to mobile-capable student models (e.g., TinyML-friendly architectures)
 - [ ] Investigate impact of using the current model with cards its never seen or trained on (no CNN classification)
 - [ ] Test integration of new cards from the latest expansion pack
