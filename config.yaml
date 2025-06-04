@@ -37,6 +37,7 @@ video_pipeline:
   cnn_conf_thresh: 0.15
   bbox_iou_thresh: 0.3
   target_fps: 30
+  display: true
 
 # --------- YOLO -----------------------------------------------------------------------------------------
 yolo:

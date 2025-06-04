@@ -56,6 +56,9 @@ class VideoPipeline:
         self.queue: Deque[Tuple[Image.Image, str]] = deque()
         self.seen_cards: Set[str] = set()
 
+        self.display = pcfg.get("display", False)
+        self.win_name = "Video" if self.display else None
+
         self.det_time = 0.0
         self.clf_time = 0.0
 
@@ -111,11 +114,27 @@ class VideoPipeline:
                 )
 
                 for x1, y1, x2, y2, *_rest, cat in bboxes:
+                    if self.display:
+                        cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
+                        cv2.putText(
+                            frame,
+                            str(cat),
+                            (int(x1), max(0, int(y1) - 10)),
+                            cv2.FONT_HERSHEY_SIMPLEX,
+                            0.6,
+                            (0, 255, 0),
+                            2,
+                        )
                     crop = Image.fromarray(frame[int(y1) : int(y2), int(x1) : int(x2)])
                     self.queue.append((crop, cat))
 
                 det_elapsed = time.time() - frame_start
                 self.det_time += det_elapsed
+
+                if self.display:
+                    cv2.imshow(self.win_name, frame)
+                    if cv2.waitKey(1) & 0xFF == ord("q"):
+                        break
 
                 # Process queue in remaining frame time
                 remaining = frame_budget - det_elapsed
@@ -123,11 +142,16 @@ class VideoPipeline:
                     self._classify_from_queue(remaining)
 
             cap.release()
+            if self.display:
+                cv2.destroyWindow(self.win_name)
 
         # Flush remaining queue
         self._classify_from_queue(float("inf"))
 
         total_time = time.time() - all_start
+
+        if self.display:
+            cv2.destroyAllWindows()
 
         if self.logger and logging:
             self.logger.info(
