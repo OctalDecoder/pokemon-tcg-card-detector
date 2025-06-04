@@ -31,6 +31,16 @@ screenshot_pipeline:
   grid_cols: 5
   middle_space: 20
 
+# --------- VIDEO DETECTOR -----------------------------------------------------
+video_pipeline:
+  yolo_conf_thresh: 0.5
+  cnn_conf_thresh: 0.5
+  bbox_iou_thresh: 0.3
+  target_fps: 10
+  display: true
+  cnn_batch_size: 8
+  save_results: True
+
 # --------- YOLO -----------------------------------------------------------------------------------------
 yolo:
   data_config: "config/yolo.yaml"

@@ -23,22 +23,23 @@
 - [x] Refactor `prototype.py` into separate classes:
   - [x] **YOLO** logic
   - [x] **CNN** logic
-- [x] Complete `Makefile` (build, test, CLI shortcuts)
+- [x] ~~Complete `Makefile` (build, test, CLI shortcuts)~~ (now in `pyproject.toml`)
 - [ ] Write and run tests for:
   - [ ] `cnn/` modules
   - [ ] `yolo/` modules
   - [ ] `train/` scripts
   - [ ] `generate_data/` scripts
 - [ ] Get all tests passing (fix thresholds, edge cases, etc.)
-- [ ] Create `requirements.txt` (pin dependencies)
-- [ ] Verify `setup.py` is production-ready
-- [ ] Implement detection classes:
-  - [ ] **ImageDetection** (single images)
-  - [ ] **VideoDetection** (frame-by-frame)
+- [x] ~~Create requirements.txt (pin dependencies)~~ (now in `pyproject.toml`)
+- [x] ~~Verify setup.py is production-ready~~ (now in `pyproject.toml`)
+- [x] Implement detection classes:
+  - [x] **ImageDetection** (single images)
+  - [x] **VideoDetection** (frame-by-frame)
+- [ ] Extend video detection to handle images in a file as the input stream
 - [ ] Evaluate moving to mobile-capable student models (e.g., TinyML-friendly architectures)
 - [ ] Investigate impact of using the current model with cards its never seen or trained on (no CNN classification)
 - [ ] Test integration of new cards from the latest expansion pack
-- [ ] (Optional) Add CI/CD workflows (e.g., GitHub Actions)
+- [ ] Add CI/CD workflows
 - [ ] Finalize README so it's a true "README" rather than a living to-do list
 - [ ] SLEEP 😴
 
@@ -91,15 +92,13 @@ This repository implements a high-performance TCG (Trading Card Game) card detec
 
 In essence, this project unifies state-of-the-art object detection and tracking (YOLOv8 + ByteTrack), perceptual hashing for ultra-fast duplicate filtering, and highly optimized neural network inference (pruning, quantization, distillation) into an end-to-end system capable of recognizing and classifying large batches of TCG cards in near real time.
 
----
-
-# 📁 Repository Setup Guide
+## 📁 Repository Setup Guide
 
 > **This guide describes how to configure, structure, and use this repo.** > _WIP: Feedback and edits welcome!_
 
 ---
 
-## 1. Prerequisites
+### 1. Prerequisites
 
 - Python ≥ 3.12
 - [pip](https://pip.pypa.io/en/stable/) (latest recommended)
@@ -107,7 +106,7 @@ In essence, this project unifies state-of-the-art object detection and tracking 
 
 ---
 
-## 2. Installation
+### 2. Installation
 
 ```bash
 # Clone the repository
@@ -120,7 +119,7 @@ pip install -e .
 
 ---
 
-## 3. Screenshots for Testing
+### 3. Screenshots for Testing
 
 - Place images to be processed in:
   `tests/fixtures/`
@@ -129,7 +128,7 @@ pip install -e .
 
 ---
 
-## 4. Data & Intermediate Model Files
+### 4. Data & Intermediate Model Files
 
 - High-resolution TCG card images live in:
   `data/raw/cards/`
@@ -138,7 +137,7 @@ pip install -e .
 
 ---
 
-## 5. Database Setup
+### 5. Database Setup
 
 - **Download or obtain** the database (`cards.db`) from \[TBD download link or instructions].
 - Place it in:
@@ -148,7 +147,7 @@ pip install -e .
 
 ---
 
-## 6. Configuration Structure
+### 6. Configuration Structure
 
 - The main configuration file is `config.yaml`.
 - The `shared` section merges into all other config sections:
@@ -160,7 +159,7 @@ pip install -e .
 
 ---
 
-## 7. Card Image Directory & Naming Convention
+### 7. Card Image Directory & Naming Convention
 
 - **Base directory:**
   Controlled by `config.yaml` → `shared` → `card_images_dir`
@@ -178,7 +177,7 @@ data/raw/cards/fullart/S5 100.png
 
 ---
 
-## 8. Output Directories
+### 8. Output Directories
 
 - By default, processed images, results, and generated data will be written to:
 
@@ -188,7 +187,7 @@ data/raw/cards/fullart/S5 100.png
 
 ---
 
-## 9. Running the Pipeline
+### 9. Running the Pipeline
 
 To process screenshots and generate results:
 
@@ -198,7 +197,7 @@ card-detector
 
 ---
 
-## 10. Work-in-Progress Notes
+### 10. Work-in-Progress Notes
 
 - Documentation is evolving; structure and locations may shift.
 - Database download location is **TBD**.
@@ -206,7 +205,7 @@ card-detector
 
 ---
 
-## ⚠️ Quick Reference
+### ⚠️ Quick Reference
 
 | Purpose                   | Path              | Config Key               |
 | ------------------------- | ----------------- | ------------------------ |
@@ -214,8 +213,6 @@ card-detector
 | Raw card images           | `data/raw/cards/` | `shared.card_images_dir` |
 | Database file             | `models/cards.db` | `shared.database`        |
 | Output/results            | `output/`         | `shared.output_dir`      |
-
----
 
 ## Real Time Processing Reasearch Suggestions
 
