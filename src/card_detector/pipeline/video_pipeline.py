@@ -97,6 +97,7 @@ class VideoPipeline:
             self.output_dir.mkdir(parents=True, exist_ok=True)
 
         self.det_time = 0.0
+        self.display_time = 0.0
 
         self.stop_event = threading.Event()
 
@@ -223,12 +224,14 @@ class VideoPipeline:
                             pil_crop = Image.fromarray(rgb_crop)
                             self.queue.put((pil_crop, cat))
 
+                self.det_time += time.time() - frame_start
+                
+                dispt = time.time()
                 # --- FPS & Detected Card Overlays ---
                 if self.display or self.save_results:
                     self._draw_fps(frame)
                     self._draw_live_detections(frame)
 
-                self.det_time += time.time() - frame_start
 
                 frame_idx += 1
 
@@ -239,6 +242,7 @@ class VideoPipeline:
                     cv2.imshow(self.win_name, frame)
                     if cv2.waitKey(1) & 0xFF == ord("q"):
                         break
+                self.display_time = time.time() - dispt
 
             cap.release()
             if video_writer is not None:
@@ -266,5 +270,5 @@ class VideoPipeline:
         if self.logger and logging:
             self.logger.info(
                 f"Processed {len(videos)} videos in {total_time:.2f}s | "
-                f"det={self.det_time:.2f}s clf={self.worker.clf_time:.2f}s"
+                f"det={self.det_time:.2f}s clf={self.worker.clf_time:.2f}s dispt={self.display_time:.2f}s"
             )
