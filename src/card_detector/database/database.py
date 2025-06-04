@@ -3,8 +3,13 @@ from io import BytesIO
 from PIL import Image
 
 class CardDB:
-    def __init__(self, db_path="data/cards.db"):
-        self.conn = sqlite3.connect(db_path)
+    def __init__(self, db_path="data/cards.db", *, check_same_thread: bool = False):
+        """Open a connection to the cards database.
+
+        ``check_same_thread`` defaults to ``False`` so that the same connection
+        can be safely used across multiple threads for read-only queries.
+        """
+        self.conn = sqlite3.connect(db_path, check_same_thread=check_same_thread)
         self.conn.row_factory = sqlite3.Row
 
     def get_name_by_seriesid_id(self, series_id, id_):

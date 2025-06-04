@@ -51,7 +51,8 @@ class VideoPipeline:
             device=self.device,
         )
 
-        self.card_db = CardDB(pcfg["database"])
+        # Share DB connection across threads for name lookups
+        self.card_db = CardDB(pcfg["database"], check_same_thread=False)
 
         self.queue: "Queue[Tuple[Image.Image, str]]" = Queue()
         self.seen_cards: Set[str] = set()
