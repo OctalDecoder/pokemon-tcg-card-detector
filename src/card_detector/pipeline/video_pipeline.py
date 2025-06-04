@@ -141,7 +141,7 @@ class VideoPipeline:
         for vp in videos:
             cap = cv2.VideoCapture(str(vp))
             if not cap.isOpened():
-                print(f"Failed to open video {vp}")
+                self.logger.info(f"Failed to open video {vp}")
                 continue
 
             # --- FPS split: display (playback/saving) and detection (processing) ---
@@ -174,9 +174,7 @@ class VideoPipeline:
                 if not ret:
                     break
 
-                # Detection only on interval
-                run_detection = (frame_idx % interval == 0)
-
+                # Yolo Detection
                 bboxes = self.yolo.detect(frame)
                 bboxes = merge_overlapping_boxes(
                     bboxes, iou_thresh=self.pcfg["bbox_iou_thresh"]
@@ -229,11 +227,10 @@ class VideoPipeline:
 
             # Print per-video seen cards and clear
             if self.seen_cards:
-                print(f"\n==> Cards detected in '{vp.name}':")
-                for card_id in sorted(self.seen_cards):
-                    print(card_id)
+                self.logger.info(f"\n==> Cards detected in '{vp.name}':")
+                self.logger.info(sorted(self.seen_cards, key=lambda x: int(x.split()[-1])))
             else:
-                print(f"\n==> No cards detected in '{vp.name}'.")
+                self.logger.info(f"\n==> No cards detected in '{vp.name}'.")
             self.seen_cards.clear()
 
         # Flush remaining queue

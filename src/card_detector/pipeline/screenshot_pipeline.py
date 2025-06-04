@@ -177,9 +177,6 @@ class ScreenshotPipeline:
                 n = len(output)
                 cols = min(pcfg["grid_cols"], n)
                 rows = math.ceil(n / cols)
-                first_thumb = next((m for m in output if m), None)
-                if first_thumb is None:
-                    continue
 
                 tw, th = self.THUMB_SIZE
                 right = Image.new('RGB', (cols * tw, rows * th), (0, 0, 0))

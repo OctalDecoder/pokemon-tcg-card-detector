@@ -17,6 +17,7 @@ dependencies = [
     "torchvision",
     "albumentations",
     "ultralytics",
+    "requests",
     "opencv-python>=4.8",
 ]
 

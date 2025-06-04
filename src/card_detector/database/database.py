@@ -3,7 +3,7 @@ from io import BytesIO
 from PIL import Image
 
 class CardDB:
-    def __init__(self, db_path="data/cards.db", *, check_same_thread: bool = False):
+    def __init__(self, db_path="models/cards.db", *, check_same_thread: bool = False):
         """Open a connection to the cards database.
 
         ``check_same_thread`` defaults to ``False`` so that the same connection
@@ -28,9 +28,3 @@ class CardDB:
 
     def close(self):
         self.conn.close()
-
-# Test usage
-if __name__ == "__main__":
-    db = CardDB()
-    print(db.get_name_by_seriesid_id("A3", "1"))
-    db.close()
