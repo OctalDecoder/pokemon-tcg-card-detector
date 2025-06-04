@@ -79,7 +79,8 @@ class ScreenshotPipeline:
             conf_threshold=cnn_cfg.get("cnn_conf_threshold", 0.15),
             device=self.device
         )
-        self.card_db = CardDB(pcfg["database"])
+        # Allow cross-thread access as classification may run in a worker
+        self.card_db = CardDB(pcfg["database"], check_same_thread=False)
 
     lru_cache(maxsize=256)
     def get_db_thumb(self, series_id: str, card_id: str) -> Image.Image:
