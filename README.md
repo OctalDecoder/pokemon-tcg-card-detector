@@ -1,7 +1,5 @@
 # 🃏 Pokemon TCG Pocket Card Detection
 
----
-
 ## 📋 Table of Contents
 
 - [General TODO](#️-general-todo)
