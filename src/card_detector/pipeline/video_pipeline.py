@@ -253,7 +253,7 @@ class VideoPipeline:
             # Print per-video seen cards and clear
             if self.seen_cards:
                 self.logger.info(f"\n==> Cards detected in '{vp.name}':")
-                self.logger.info(sorted(self.seen_cards, key=lambda x: int(x.split()[-1])))
+                self.logger.info(sorted(self.seen_cards, key=lambda x: (x.split()[0], int(x.split()[-1]))))
             else:
                 self.logger.info(f"\n==> No cards detected in '{vp.name}'.")
             self.seen_cards.clear()
