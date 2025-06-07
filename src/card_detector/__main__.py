@@ -42,12 +42,16 @@ def main():
         pipeline = VideoPipeline(yolo_cfg, cnn_cfg, pcfg, logger=logger)
         logger.info("Starting video pipeline...")
         results = pipeline.process_videos()
+        if results is not None:
+            logger.info(results)
+            logger.info(f"Total results from all videos: {len(results)}")
+            logger.warning("There is a minor bug where the video finishes but the classifications are still queued. The above output will always be the full TRUE list.")
     else:
         pipeline = ScreenshotPipeline(yolo_cfg, cnn_cfg, pcfg, logger=logger)
         logger.info("Starting pipeline with batch classification...")
         results = pipeline.process_images()
-    if results is not None:
-        logger.info(results)
+        if results is not None:
+            logger.info(results)
 
 
 if __name__ == "__main__":
