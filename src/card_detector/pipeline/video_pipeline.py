@@ -8,17 +8,17 @@ Classes:
         - __init__(yolo_cfg, cnn_cfg, pcfg, logger=None):
             Initialize YOLO detector, CNN classifier, shared CardDB, and threading resources.
         - _worker_loop():
-            Internal method to start the CropClassifierWorker loop in a separate thread.
+            Internal method to start the ClassifierWorker loop in a separate thread.
         - _draw_fps(frame):
             Compute and overlay FPS estimate on the given frame.
         - _draw_live_detections(frame):
             Overlay recent card detections on the given frame.
         - process_videos(video_dir=None, logging=True) -> Set[str]:
             Process all `.mp4` files in `video_dir`. For each video:
-                • Read frames, run YOLO to get bounding boxes.
-                • Every Nth frame (based on target FPS), extract crops and enqueue for CNN classification.
-                • Overlay FPS and live detections if `display` or `save_results` is enabled.
-                • Optionally save annotated video to `output_dir`.
+                - Read frames, run YOLO to get bounding boxes.
+                - Every Nth frame (based on target FPS), extract crops and enqueue for CNN classification.
+                - Overlay FPS and live detections if `display` or `save_results` is enabled.
+                - Optionally save annotated video to `output_dir`.
             Returns a set of detected card IDs across all videos.
 
 Usage Example:
@@ -46,7 +46,7 @@ from card_detector.cnn.classifier import CnnClassifier
 from card_detector.yolo.detector import YoloDetector
 from .screenshot_pipeline import merge_overlapping_boxes
 from card_detector.ui.video_overlay import draw_fps_overlay, draw_live_detections_overlay
-from card_detector.pipeline.video_worker import CropClassifierWorker
+from card_detector.pipeline.video_classification import ClassifierWorker
 
 
 class VideoPipeline:
@@ -86,16 +86,24 @@ class VideoPipeline:
         self.detection_fps = pcfg.get("target_fps", 30)
         self.batch_size = pcfg.get("cnn_batch_size", 8)
 
-        self.display = pcfg.get("display", False)
-        self.win_name = "Video" if self.display else None
+        self.display_video = pcfg.get("display_video", False)
+        self.win_name = "Video" if self.display_video else None
 
-        self.save_results = pcfg.get("save_results", False)
+        self.record_video = pcfg.get("record_video", False)
         self.output_dir = Path(pcfg.get("output_dir", "output")) / "video_pipeline"
-        if self.save_results:
+        if self.record_video:
             if self.output_dir.exists():
                 shutil.rmtree(self.output_dir)
             self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.show_fps = pcfg["show_fps"]
+        self.show_classifications = pcfg["show_classifications"]
+        self.show_bboxes = pcfg["show_bboxes"]
+        
+        self.turbo = pcfg["turbo"]
+        self.detection_frame_skip = pcfg["detection_skip"]
+        self.classification_frame_skip = pcfg["classification_skip"]
 
+        self.frame_idx = 0
         self.det_time = 0.0
         self.display_time = 0.0
 
@@ -113,7 +121,7 @@ class VideoPipeline:
         self._overlay_lock = threading.Lock()
 
         # Refactored worker for classification
-        self.worker = CropClassifierWorker(
+        self.worker = ClassifierWorker(
             queue=self.queue,
             cnn=self.cnn,
             card_db=self.card_db,
@@ -167,19 +175,15 @@ class VideoPipeline:
                 continue
 
             # --- FPS split: display (playback/saving) and detection (processing) ---
-            video_fps = cap.get(cv2.CAP_PROP_FPS)
-            display_fps = video_fps or 30  # For display and saving video, match original FPS or fallback to 30
-            detection_fps = self.detection_fps  # For detection, as set in __init__
-
-            # Calculate interval: process every Nth frame for detection
-            interval = max(1, round(display_fps / detection_fps))
-            frame_idx = 0
+            display_fps = cap.get(cv2.CAP_PROP_FPS) or 30  # For display and saving video, match original FPS or fallback to 30
+            detection_fps = self.detection_frame_skip
+            self.frame_idx = 0
 
             if self.logger and logging:
                 self.logger.info(f"Processing video {vp.name} at {display_fps:.2f} display FPS, {detection_fps} detection FPS")
 
             # Set up video writer if saving results
-            if self.save_results:
+            if self.record_video:
                 fourcc = cv2.VideoWriter_fourcc(*"mp4v")
                 out_path = self.output_dir / (vp.stem + "_detected.mp4")
                 width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -188,57 +192,66 @@ class VideoPipeline:
             else:
                 video_writer = None
 
-            self.seen_cards.clear()  # Isolate per-video
-
+            self.seen_cards.clear()
+            self.frame_idx = 0
+            self.det_frame_idx = 0
+            
             while True:
                 frame_start = time.time()
                 ret, frame = cap.read()
                 if not ret:
                     break
+                
+                if self.turbo and self.frame_idx % self.detection_frame_skip > 0:
+                    self.frame_idx += 1
+                    continue
 
                 # Yolo Detection
-                bboxes = self.yolo.detect(frame)
-                bboxes = merge_overlapping_boxes(
-                    bboxes, iou_thresh=self.pcfg["bbox_iou_thresh"]
-                )
+                if self.frame_idx % self.detection_frame_skip == 0:
+                    bboxes = self.yolo.detect(frame)
+                    bboxes = merge_overlapping_boxes(
+                        bboxes, iou_thresh=self.pcfg["bbox_iou_thresh"]
+                    )
 
-                for x1, y1, x2, y2, *_rest, cat in bboxes:
-                    if self.display:
-                        cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
-                        cv2.putText(
-                            frame,
-                            str(cat),
-                            (int(x1), max(0, int(y1) - 10)),
-                            cv2.FONT_HERSHEY_SIMPLEX,
-                            0.6,
-                            (0, 255, 0),
-                            2,
-                        )
-                    # Queue crops for CNN
-                    run_classification = (frame_idx % interval == 0)
-                    if run_classification:
-                        x1_, y1_, x2_, y2_ = map(int, (x1, y1, x2, y2))
-                        bgr_crop = frame[y1_:y2_, x1_:x2_]
-                        if bgr_crop.size != 0:  # ensure non-empty crop
-                            rgb_crop = cv2.cvtColor(bgr_crop, cv2.COLOR_BGR2RGB)
-                            pil_crop = Image.fromarray(rgb_crop)
-                            self.queue.put((pil_crop, cat))
+                    for x1, y1, x2, y2, *_rest, cat in bboxes:
+                        if self.show_bboxes and self.display_video:
+                            cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
+                            cv2.putText(
+                                frame,
+                                str(cat),
+                                (int(x1), max(0, int(y1) - 10)),
+                                cv2.FONT_HERSHEY_SIMPLEX,
+                                0.6,
+                                (0, 255, 0),
+                                2,
+                            )
+                        # Queue crops for CNN
+                        if self.det_frame_idx % self.detection_frame_skip == 0:
+                            x1_, y1_, x2_, y2_ = map(int, (x1, y1, x2, y2))
+                            bgr_crop = frame[y1_:y2_, x1_:x2_]
+                            if bgr_crop.size != 0:  # ensure non-empty crop
+                                rgb_crop = cv2.cvtColor(bgr_crop, cv2.COLOR_BGR2RGB)
+                                pil_crop = Image.fromarray(rgb_crop)
+                                self.queue.put((pil_crop, cat))
 
-                self.det_time += time.time() - frame_start
+                    self.det_time += time.time() - frame_start
+                    self.det_frame_idx += 1
                 
                 dispt = time.time()
                 # --- FPS & Detected Card Overlays ---
-                if self.display or self.save_results:
-                    self._draw_fps(frame)
-                    self._draw_live_detections(frame)
+                if self.display_video or self.record_video:
+                    if self.show_fps:
+                        self._draw_fps(frame)
+                    if self.show_classifications:
+                        self._draw_live_detections(frame)
 
 
-                frame_idx += 1
+                self.frame_idx += 1
 
                 if video_writer is not None:
                     video_writer.write(frame)
 
-                if self.display:
+                if self.display_video:
                     cv2.imshow(self.win_name, frame)
                     if cv2.waitKey(1) & 0xFF == ord("q"):
                         break
@@ -247,13 +260,14 @@ class VideoPipeline:
             cap.release()
             if video_writer is not None:
                 video_writer.release()
-            if self.display:
+            if self.display_video:
                 cv2.destroyWindow(self.win_name)
 
             # Print per-video seen cards and clear
             if self.seen_cards:
                 self.logger.info(f"\n==> Cards detected in '{vp.name}':")
                 self.logger.info(sorted(self.seen_cards, key=lambda x: (x.split()[0], int(x.split()[-1]))))
+                self.logger.info(f"Cards detected: {len(self.seen_cards)}")
             else:
                 self.logger.info(f"\n==> No cards detected in '{vp.name}'.")
             self.seen_cards.clear()
@@ -264,7 +278,7 @@ class VideoPipeline:
 
         total_time = time.time() - all_start
 
-        if self.display:
+        if self.display_video:
             cv2.destroyAllWindows()
 
         if self.logger and logging:

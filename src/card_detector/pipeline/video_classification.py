@@ -1,26 +1,7 @@
-"""
-video_worker.py
-
-Background worker module for batching and classifying YOLO crops. Continuously
-pulls cropped card images and category labels from a thread-safe queue, processes
-them in batches through the CNN classifier, accumulates classification time, and
-updates live detection overlays.
-
-Classes:
-    CropClassifierWorker:
-        - __init__(queue, cnn, card_db, seen_cards, overlay_lock, live_detections, batch_size, stop_event):
-            Initialize the worker with shared resources and configuration.
-        - run(budget=float("inf")):
-            Process queued crops in batches within a time budget, classify them, and
-            update seen cards and live_detections.
-        - loop():
-            Main loop that continuously checks the queue and calls run() until stopped.
-"""
-
 import time
 from queue import Empty
 
-class CropClassifierWorker:
+class ClassifierWorker:
     """
     Background worker for processing queued crops in batches.
     Designed to run in its own thread.
