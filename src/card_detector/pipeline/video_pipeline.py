@@ -27,7 +27,7 @@ from __future__ import annotations
 import time
 import threading
 import shutil
-from queue import Queue, Full
+from queue import Empty, Queue, Full
 from pathlib import Path
 from typing import Optional, Set, Tuple, List, Dict
 
@@ -39,7 +39,7 @@ from card_detector.cnn.classifier import CnnClassifier
 from card_detector.yolo.detector import YoloDetector
 from card_detector.ui.video_overlay import draw_fps_overlay, draw_live_detections_overlay, draw_bounding_box
 from .screenshot_pipeline import merge_overlapping_boxes
-from .video_classification import ClassifierWorker
+from ..cnn.video_classification import ClassifierWorker
 
 # -------------------------
 # Module-Level Defaults/Constants
@@ -47,7 +47,7 @@ from .video_classification import ClassifierWorker
 DEFAULT_CODEC = "mp4v"
 DEFAULT_OUTPUT_SUBDIR = "video_pipeline"
 DEFAULT_DISPLAY_FPS = 30
-DEFAULT_QUEUE_MAXSIZE = 128
+DEFAULT_QUEUE_MAXSIZE = 1024
 DEFAULT_VIDEO_EXT = "*.mp4"
 DEFAULT_FPS_WINDOW = 30
 DEFAULT_DETECTION_DISPLAY_SECS = 2.0
@@ -255,6 +255,7 @@ class VideoPipeline:
                                 if self.logger:
                                     self.logger.info("Exit requested by user (q). Stopping pipeline.")
                                 self.stop_event.set()
+                                worker.join()
                                 break
                         self.render_time = time.time() - render_time
 
@@ -309,7 +310,7 @@ class VideoPipeline:
 
             # End for videos
             self.stop_event.set()
-            worker.join(timeout=5)
+            worker.join()
         except KeyboardInterrupt:
             self.stop_event.set()
             if self.logger:
