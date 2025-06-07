@@ -7,11 +7,12 @@ class ClassifierWorker:
     Designed to run in its own thread.
     """
 
-    def __init__(self, queue, cnn, card_db, seen_cards, overlay_lock, live_detections, batch_size, stop_event):
+    def __init__(self, queue, cnn, card_db, seen_cards, all_seen_cards, overlay_lock, live_detections, batch_size, stop_event):
         self.queue = queue
         self.cnn = cnn
         self.card_db = card_db
         self.seen_cards = seen_cards
+        self.all_seen_cards = all_seen_cards
         self.overlay_lock = overlay_lock
         self.live_detections = live_detections
         self.batch_size = batch_size
@@ -37,6 +38,7 @@ class ClassifierWorker:
             labels = self.cnn.classify(imgs, cats)
             self.clf_time += time.time() - t0
             for card_id in labels:
+                if card_id not in self.all_seen_cards: self.all_seen_cards.add(card_id)
                 if card_id not in self.seen_cards:
                     self.seen_cards.add(card_id)
                     name = self.card_db.get_name_by_seriesid_id(*card_id.split(" "))

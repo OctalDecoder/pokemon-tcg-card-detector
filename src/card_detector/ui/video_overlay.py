@@ -1,8 +1,3 @@
-"""video_overlay.py
-
-Utility functions for drawing real-time overlays on video frames.
-"""
-
 import cv2
 
 def draw_box_with_text(
@@ -60,3 +55,18 @@ def draw_live_detections_overlay(frame, live_items):
         )
         x = w - margin_x - text_width
         draw_box_with_text(frame, x, y, display_str)
+
+def draw_bounding_box(frame, bbox, label=None, color=(0,255,0), thickness=2):
+    """Draws a bounding box and an optional label above it."""
+    x1, y1, x2, y2 = map(int, bbox)
+    cv2.rectangle(frame, (x1, y1), (x2, y2), color, thickness)
+    if label is not None:
+        cv2.putText(
+            frame,
+            label,
+            (x1, max(0, y1 - 10)),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.6,
+            color,
+            2,
+        )

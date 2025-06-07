@@ -16,18 +16,18 @@ shared:
   output_dir: "output/"
 
   # General
-  debug: False
+  debug: false
   database: "models/cards.db"
 
 # --------- SCREENSHOT DETECTOR --------------------------------------------------------------------------
 screenshot_pipeline:
-  use_master_cnn: False # If true, distilled student CNNs are ignored
+  use_master_cnn: false # If true, distilled student CNNs are ignored
   yolo_conf_thresh: 0.1
   cnn_conf_thresh: 0.15
   bbox_iou_thresh: 0.3 # Yolo outputs overlapping by this value will be merged if possible (0 = off)
 
   # Results
-  save_results: True
+  save_results: true
   grid_cols: 5
   middle_space: 20
 
@@ -36,18 +36,22 @@ video_pipeline:
   yolo_conf_thresh: 0.5
   cnn_conf_thresh: 0.5
   bbox_iou_thresh: 0.3
-  target_fps: 10
   cnn_batch_size: 8
 
+  # Performance tuning
+  turbo: true # Only processes frames that run detection. Faster with > detection_skip.
   detection_skip: 4 # Saves CPU significantly - skips detection on frames
   classification_skip: 0 # How many deteciton frames to skip, better to tune detection_skip
 
-  turbo: true # Only processes necessary frames. Extremely fast.
+  # Display and Render
   display_video: true
+  display_fps: null # null to use native fps. Upper bound live display FPS (turbo overrides this)
+
   record_video: true
+  recording_fps: null # null to use videos original fps (turbo overrides this)
 
   show_fps: true
-  show_bboxes: true
+  show_bboxes: false
   show_classifications: true
   classification_timer: 3
 
