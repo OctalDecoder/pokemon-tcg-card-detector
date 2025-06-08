@@ -1,7 +1,5 @@
 # 🃏 Pokemon TCG Pocket Card Detection
 
----
-
 ## 📋 Table of Contents
 
 - [General TODO](#️-general-todo)
@@ -48,7 +46,7 @@
 - [ ] Evaluate moving to mobile-capable student models (TinyML-friendly)
 - [ ] Investigate using the model on cards it’s never seen or trained on (no CNN classification)
 - [ ] Prune and quantise the student CNNs
-- [ ] Add `pHash` duplicate filtering to reduce processing time
+- [x] Add `pHash` duplicate filtering to reduce processing time
 - [ ] Test integration of new cards from the latest expansion pack
 - [ ] Add CI/CD workflows
 - [ ] Finalize README so it's a true "README" (not just a to-do list)

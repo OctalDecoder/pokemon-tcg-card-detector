@@ -4,6 +4,7 @@ def main():
     from card_detector.config import cfg
     from card_detector.pipeline.screenshot_pipeline import ScreenshotPipeline
     from card_detector.pipeline.video_pipeline import VideoPipeline
+    from card_detector.util.logging import print_section_header
 
     logging.basicConfig(
         format="%(asctime)s [%(levelname)s] %(message)s",
@@ -18,7 +19,16 @@ def main():
         default="screenshot",
         help="Detection mode",
     )
+    parser.add_argument(
+        "-v",
+        "--video",
+        action="store_true",
+        help="Shortcut for --mode video",
+    )
     args = parser.parse_args()
+    
+    if args.video:
+        args.mode = "video"
 
     pcfg = cfg["video_pipeline"] if args.mode == "video" else cfg["screenshot_pipeline"]
 
@@ -40,14 +50,21 @@ def main():
 
     if args.mode == "video":
         pipeline = VideoPipeline(yolo_cfg, cnn_cfg, pcfg, logger=logger)
-        logger.info("Starting video pipeline...")
         results = pipeline.process_videos()
+        if results is not None:
+            total = 0
+            print_section_header("Results")
+            for video, cards in results.items():
+                logger.info(f"{video}: {sorted(cards, key=lambda s: (s.split()[0], int(s.split()[1]))) if cards else 'No cards detected.'}")
+                total += len(cards)
+            logger.info(f"Total cards detected: {total}")
+
     else:
         pipeline = ScreenshotPipeline(yolo_cfg, cnn_cfg, pcfg, logger=logger)
         logger.info("Starting pipeline with batch classification...")
         results = pipeline.process_images()
-    if results is not None:
-        logger.info(results)
+        if results is not None:
+            logger.info(results)
 
 
 if __name__ == "__main__":

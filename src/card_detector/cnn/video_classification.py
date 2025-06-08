@@ -1,32 +1,24 @@
-"""
-video_worker.py
-
-Background worker module for batching and classifying YOLO crops. Continuously
-pulls cropped card images and category labels from a thread-safe queue, processes
-them in batches through the CNN classifier, accumulates classification time, and
-updates live detection overlays.
-
-Classes:
-    CropClassifierWorker:
-        - __init__(queue, cnn, card_db, seen_cards, overlay_lock, live_detections, batch_size, stop_event):
-            Initialize the worker with shared resources and configuration.
-        - run(budget=float("inf")):
-            Process queued crops in batches within a time budget, classify them, and
-            update seen cards and live_detections.
-        - loop():
-            Main loop that continuously checks the queue and calls run() until stopped.
-"""
-
 import time
 from queue import Empty
 
-class CropClassifierWorker:
+class ClassifierWorker:
     """
     Background worker for processing queued crops in batches.
     Designed to run in its own thread.
     """
 
-    def __init__(self, queue, cnn, card_db, seen_cards, overlay_lock, live_detections, batch_size, stop_event):
+    def __init__(
+        self,
+        queue,
+        cnn,
+        card_db,
+        seen_cards,
+        overlay_lock,
+        live_detections,
+        batch_size,
+        stop_event,
+        queue_wait_times=None,
+    ):
         self.queue = queue
         self.cnn = cnn
         self.card_db = card_db
@@ -36,6 +28,7 @@ class CropClassifierWorker:
         self.batch_size = batch_size
         self.stop_event = stop_event
         self.clf_time = 0.0
+        self.queue_wait_times = queue_wait_times if queue_wait_times is not None else []
 
     def run(self, budget=float("inf")):
         """Process queued crops in batches within `budget` seconds."""
@@ -43,9 +36,12 @@ class CropClassifierWorker:
         while (time.time() - start) < budget and not self.queue.empty():
             imgs = []
             cats = []
+            queue_waits = []
             for _ in range(min(self.batch_size, self.queue.qsize())):
                 try:
-                    crop, cat = self.queue.get_nowait()
+                    crop, cat, enqueue_time = self.queue.get_nowait()
+                    queue_wait = time.time() - enqueue_time
+                    queue_waits.append(queue_wait)
                 except Empty:
                     break
                 imgs.append(crop)
@@ -55,6 +51,8 @@ class CropClassifierWorker:
             t0 = time.time()
             labels = self.cnn.classify(imgs, cats)
             self.clf_time += time.time() - t0
+            if self.queue_wait_times is not None and queue_waits:
+                self.queue_wait_times.extend(queue_waits)
             for card_id in labels:
                 if card_id not in self.seen_cards:
                     self.seen_cards.add(card_id)
