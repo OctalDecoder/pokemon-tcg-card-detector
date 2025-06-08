@@ -39,9 +39,12 @@ video_pipeline:
   cnn_batch_size: 8
 
   # Performance tuning
+  phashing_enabled: true # Hash detections to ignore duplicates, more cpu load, less gpu, less time
+  phash_hamming_distance: 3
   turbo: true # Only processes frames that run detection. Faster with > detection_skip.
   detection_skip: 4 # Saves CPU significantly - skips detection on frames
   classification_skip: 0 # How many deteciton frames to skip, better to tune detection_skip
+  detection_queue_maxsize: 1024 # Backlog of detections, if over this number, don't process detections
 
   # Display and Render
   display_video: true

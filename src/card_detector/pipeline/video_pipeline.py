@@ -27,23 +27,23 @@ from __future__ import annotations
 import time
 import threading
 import shutil
-from queue import Empty, Queue, Full
+from collections import deque
 from pathlib import Path
+from queue import Empty, Queue, Full
 from typing import Optional, Set, Tuple, List, Dict
 
 import cv2
+import imagehash
 from PIL import Image
 
 from card_detector.database.database import CardDB
 from card_detector.cnn.classifier import CnnClassifier
+from card_detector.cnn.video_classification import ClassifierWorker
 from card_detector.yolo.detector import YoloDetector
 from card_detector.ui.video_overlay import draw_fps_overlay, draw_live_detections_overlay, draw_bounding_box
 from .screenshot_pipeline import merge_overlapping_boxes
-from ..cnn.video_classification import ClassifierWorker
 
-# -------------------------
 # Module-Level Defaults/Constants
-# -------------------------
 DEFAULT_CODEC = "mp4v"
 DEFAULT_OUTPUT_SUBDIR = "video_pipeline"
 DEFAULT_DISPLAY_FPS = 30
@@ -116,6 +116,11 @@ class VideoPipeline:
         self.det_time = 0.0
         self.render_time = 0.0
         self.stop_event = threading.Event()
+        
+        # Perceptual Hashing
+        self.phashing_enabled = pcfg.get("phashing_enabled", False)
+        self.phash_hamming_thresh =  pcfg.get("phash_hamming_distance", 5)
+        self.crop_phash_buffer = deque(maxlen=30)  # Perceptual Hashing
 
         # Overlay/Display state
         self._fps_times: List[float] = []
@@ -176,7 +181,6 @@ class VideoPipeline:
 
         try:
             for vp in videos:
-                # Try-except per video for robust resource cleanup/logging
                 try:
                     cap = cv2.VideoCapture(str(vp))
                     if not cap.isOpened():
@@ -209,16 +213,19 @@ class VideoPipeline:
                     self.seen_cards.clear()
                     self.frame_idx = 0
 
+                    # Video Processing Loop
                     while not self.stop_event.is_set():
                         frame_start = time.time()
                         ret, frame = cap.read()
                         if not ret:
                             break
-
+                        
+                        # Turbo mode ignores non-detection frames
                         if self.turbo and self.frame_idx % self.detection_frame_skip > 0:
                             self.frame_idx += 1
                             continue
-
+                        
+                        # YOLOv8 Detection Pipeline
                         if self.frame_idx % self.detection_frame_skip == 0:
                             bboxes = self.yolo.detect(frame)
                             bboxes = merge_overlapping_boxes(
@@ -227,21 +234,38 @@ class VideoPipeline:
                             for x1, y1, x2, y2, *_rest, cat in bboxes:
                                 if self.show_bboxes and self.display_video:
                                     draw_bounding_box(frame, (x1, y1, x2, y2), str(cat))
-                                # Enqueue for CNN with queue-size protection
+                                
+                                # Crop detections and queue for CNN classification
                                 x1_, y1_, x2_, y2_ = map(int, (x1, y1, x2, y2))
                                 bgr_crop = frame[y1_:y2_, x1_:x2_]
                                 if bgr_crop.size != 0:
                                     rgb_crop = cv2.cvtColor(bgr_crop, cv2.COLOR_BGR2RGB)
                                     pil_crop = Image.fromarray(rgb_crop)
-                                    try:
-                                        self.detection_queue.put_nowait((pil_crop, cat))
-                                    except Full:
-                                        if self.logger:
-                                            self.logger.warning(
-                                                f"Detection queue full (max {self.queue_maxsize}), skipping a crop at frame {self.frame_idx}."
-                                            )
-                            self.det_time += time.time() - frame_start
 
+                                    # Perceptual Hashing
+                                    is_duplicate_crop = False
+                                    if self.phashing_enabled:
+                                        crop_phash = imagehash.phash(pil_crop)
+                                        is_duplicate_crop = any(
+                                            crop_phash - prev_hash <= self.phash_hamming_thresh
+                                            for prev_hash in self.crop_phash_buffer
+                                        )
+                                        if not is_duplicate_crop:
+                                            self.crop_phash_buffer.append(crop_phash)
+
+                                    # Queue for CNN if queue has room
+                                    if not is_duplicate_crop:
+                                        try:
+                                            self.detection_queue.put_nowait((pil_crop, cat))
+                                        except Full:
+                                            if self.logger:
+                                                self.logger.warning(
+                                                    f"Detection queue full (max {self.queue_maxsize}), skipping a crop at frame {self.frame_idx}."
+                                                )
+
+                            self.det_time += time.time() - frame_start
+                        
+                        # Rendering and recording video
                         render_time = time.time()
                         if self.display_video or self.record_video:
                             self._draw_fps(frame)
@@ -259,6 +283,7 @@ class VideoPipeline:
                                 break
                         self.render_time = time.time() - render_time
 
+                        # Simulate real time video processing
                         if not self.turbo and self.display_fps:
                             elapsed = time.time() - frame_start
                             frame_duration = 1.0 / self.display_fps
@@ -266,6 +291,7 @@ class VideoPipeline:
                             if to_sleep > 0:
                                 time.sleep(to_sleep)
 
+                        # Debugging
                         if self.logger and self.pcfg.get("debug", False):
                             self.logger.debug(
                                 f"Frame {self.frame_idx}: "
@@ -274,13 +300,14 @@ class VideoPipeline:
                             )
                         self.frame_idx += 1
 
+                    # Free resources
                     cap.release()
                     if video_writer is not None:
                         video_writer.release()
                     if self.display_video:
                         cv2.destroyWindow(self.win_name)
 
-                    # Per-video detected cards
+                    # Output cards detected in current video
                     if self.seen_cards:
                         if self.logger:
                             self.logger.info(
@@ -294,6 +321,7 @@ class VideoPipeline:
 
                     self.seen_cards.clear()
 
+                # Graceful exit on error, freeing resources
                 except Exception as e:
                     if self.logger:
                         self.logger.exception(f"Exception while processing '{vp}': {e}")
@@ -308,9 +336,11 @@ class VideoPipeline:
                         except Exception:
                             pass
 
-            # End for videos
+            # All videos processed, finish classification
             self.stop_event.set()
             worker.join()
+        
+        # Graceful exit on manual interrupt, free all resources
         except KeyboardInterrupt:
             self.stop_event.set()
             if self.logger:
@@ -323,6 +353,7 @@ class VideoPipeline:
                 except Exception:
                     pass
 
+        # Log metrics and return results
         total_time = time.time() - all_start
         if self.logger and logging:
             self.logger.info(
