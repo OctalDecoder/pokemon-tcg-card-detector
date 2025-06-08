@@ -25,6 +25,12 @@ def main():
         action="store_true",
         help="Shortcut for --mode video",
     )
+    parser.add_argument(
+        "-hl",
+        "--headless",
+        action="store_true",
+        help="Run detection without rendering video or saving results",
+    )
     args = parser.parse_args()
     
     if args.video:
@@ -47,6 +53,11 @@ def main():
         "cnn_model_dir": pcfg["cnn_model_dir"],
         "cnn_conf_threshold": pcfg["cnn_conf_thresh"],
     }
+    
+    if args.headless:
+        pcfg["save_results"] = False
+        pcfg["display_video"] = False
+        pcfg["record_video"] = False
 
     if args.mode == "video":
         pipeline = VideoPipeline(yolo_cfg, cnn_cfg, pcfg, logger=logger)
