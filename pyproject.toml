@@ -10,15 +10,16 @@ readme = "README.md"
 requires-python = ">=3.8"
 authors = [{ name = "OctalDecoder", email = "octaldecoder@gmail.com" }]
 dependencies = [
+    "albumentations",
+    "imagehash",
+    "numpy",
+    "opencv-python>=4.8",
     "pyyaml",
     "Pillow",
-    "numpy",
+    "requests",
     "torch",
     "torchvision",
-    "albumentations",
     "ultralytics",
-    "requests",
-    "opencv-python>=4.8",
 ]
 
 [project.scripts]

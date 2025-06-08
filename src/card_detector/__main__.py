@@ -19,7 +19,16 @@ def main():
         default="screenshot",
         help="Detection mode",
     )
+    parser.add_argument(
+        "-v",
+        "--video",
+        action="store_true",
+        help="Shortcut for --mode video",
+    )
     args = parser.parse_args()
+    
+    if args.video:
+        args.mode = "video"
 
     pcfg = cfg["video_pipeline"] if args.mode == "video" else cfg["screenshot_pipeline"]
 
