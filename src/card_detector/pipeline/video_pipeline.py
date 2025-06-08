@@ -41,6 +41,7 @@ from card_detector.cnn.classifier import CnnClassifier
 from card_detector.cnn.video_classification import ClassifierWorker
 from card_detector.yolo.detector import YoloDetector
 from card_detector.ui.video_overlay import draw_fps_overlay, draw_live_detections_overlay, draw_bounding_box
+from card_detector.util.logging import print_section_header
 from .screenshot_pipeline import merge_overlapping_boxes
 
 # Module-Level Defaults/Constants
@@ -69,6 +70,7 @@ class VideoPipeline:
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
         # Config variables (read from pcfg or fall back to module-level defaults)
+        self.debug = self.pcfg.get("debug", False)
         self.display_fps = pcfg.get("display_fps", None)
         self.recording_fps = pcfg.get("recording_fps", None)
         self.native_fps = None  # Determined per video
@@ -109,14 +111,20 @@ class VideoPipeline:
         self.card_db = CardDB(pcfg["database"], check_same_thread=False)
 
         # State & Queues
-        self.detection_queue: "Queue[Tuple[Image.Image, str]]" = Queue(maxsize=self.queue_maxsize)
+        self.detection_queue: "Queue[Tuple[Image.Image, str, float]]" = Queue(maxsize=self.queue_maxsize)
         self.seen_cards: Set[str] = set()
-        self.all_seen_cards: Set[str] = set()
+        self.all_video_detections = {}
         self.frame_idx = 0
         self.det_time = 0.0
         self.render_time = 0.0
+        self.cumulative_render_time = 0.0  # Sum of render times
         self.stop_event = threading.Event()
-        
+
+        # Metrics
+        self.skipped_frame_count = 0
+        self.queue_wait_times = []  # Track queue wait times (sec)
+        self.total_frames_processed = 0
+
         # Perceptual Hashing
         self.phashing_enabled = pcfg.get("phashing_enabled", False)
         self.phash_hamming_thresh =  pcfg.get("phash_hamming_distance", 5)
@@ -135,11 +143,11 @@ class VideoPipeline:
             cnn=self.cnn,
             card_db=self.card_db,
             seen_cards=self.seen_cards,
-            all_seen_cards=self.all_seen_cards,
             overlay_lock=self._overlay_lock,
             live_detections=self._live_detections,
             batch_size=self.batch_size,
             stop_event=self.stop_event,
+            queue_wait_times=self.queue_wait_times,
         )
 
     def _worker_loop(self) -> None:
@@ -172,6 +180,9 @@ class VideoPipeline:
     ) -> Set[str]:
         """Process all `.mp4` files in `video_dir` and return detected cards."""
 
+        print_section_header("Video Pipeline")
+        self.logger.info("Starting video pipeline...")
+
         video_dir = video_dir or self.pcfg["video_dir"]
         videos = sorted(Path(video_dir).glob(DEFAULT_VIDEO_EXT))
 
@@ -192,7 +203,7 @@ class VideoPipeline:
                     self.display_fps = self.display_fps or self.native_fps or DEFAULT_DISPLAY_FPS
                     self.recording_fps = self.recording_fps or self.native_fps or DEFAULT_DISPLAY_FPS
                     self.detection_fps = max(1, self.display_fps // (self.detection_frame_skip + 1))
-                    
+
                     if self.logger and logging:
                         self.logger.info(
                             f"Processing video '{vp.name}' @ {self.native_fps if self.native_fps else 'DEFAULTED_TO_30_'} FPS | "
@@ -219,14 +230,18 @@ class VideoPipeline:
                         ret, frame = cap.read()
                         if not ret:
                             break
-                        
+
+                        self.total_frames_processed += 1
+
                         # Turbo mode ignores non-detection frames
                         if self.turbo and self.frame_idx % self.detection_frame_skip > 0:
                             self.frame_idx += 1
+                            self.skipped_frame_count += 1
                             continue
-                        
+
                         # YOLOv8 Detection Pipeline
                         if self.frame_idx % self.detection_frame_skip == 0:
+                            det_start = time.time()
                             bboxes = self.yolo.detect(frame)
                             bboxes = merge_overlapping_boxes(
                                 bboxes, iou_thresh=self.pcfg["bbox_iou_thresh"]
@@ -234,7 +249,7 @@ class VideoPipeline:
                             for x1, y1, x2, y2, *_rest, cat in bboxes:
                                 if self.show_bboxes and self.display_video:
                                     draw_bounding_box(frame, (x1, y1, x2, y2), str(cat))
-                                
+
                                 # Crop detections and queue for CNN classification
                                 x1_, y1_, x2_, y2_ = map(int, (x1, y1, x2, y2))
                                 bgr_crop = frame[y1_:y2_, x1_:x2_]
@@ -255,18 +270,19 @@ class VideoPipeline:
 
                                     # Queue for CNN if queue has room
                                     if not is_duplicate_crop:
+                                        enqueue_time = time.time()
                                         try:
-                                            self.detection_queue.put_nowait((pil_crop, cat))
+                                            self.detection_queue.put_nowait((pil_crop, cat, enqueue_time))
                                         except Full:
                                             if self.logger:
                                                 self.logger.warning(
                                                     f"Detection queue full (max {self.queue_maxsize}), skipping a crop at frame {self.frame_idx}."
                                                 )
 
-                            self.det_time += time.time() - frame_start
-                        
+                            self.det_time += time.time() - det_start
+
                         # Rendering and recording video
-                        render_time = time.time()
+                        render_start = time.time()
                         if self.display_video or self.record_video:
                             self._draw_fps(frame)
                             self._draw_live_detections(frame)
@@ -281,7 +297,8 @@ class VideoPipeline:
                                 self.stop_event.set()
                                 worker.join()
                                 break
-                        self.render_time = time.time() - render_time
+                        self.render_time = time.time() - render_start
+                        self.cumulative_render_time += self.render_time
 
                         # Simulate real time video processing
                         if not self.turbo and self.display_fps:
@@ -292,7 +309,7 @@ class VideoPipeline:
                                 time.sleep(to_sleep)
 
                         # Debugging
-                        if self.logger and self.pcfg.get("debug", False):
+                        if self.logger and self.debug:
                             self.logger.debug(
                                 f"Frame {self.frame_idx}: "
                                 f"Queue size={self.detection_queue.qsize()} | "
@@ -308,18 +325,18 @@ class VideoPipeline:
                         cv2.destroyWindow(self.win_name)
 
                     # Output cards detected in current video
-                    if self.seen_cards:
+                    if self.seen_cards and self.debug:
                         if self.logger:
                             self.logger.info(
                                 f"\n==> Cards detected in '{vp.name}':\n"
                                 f"{sorted(self.seen_cards, key=lambda x: (x.split()[0], int(x.split()[-1])))}\n"
                                 f"Cards detected: {len(self.seen_cards)}"
                             )
-                    else:
+                    elif not self.seen_cards and self.debug:
                         if self.logger:
                             self.logger.info(f"\n==> No cards detected in '{vp.name}'.")
-
-                    self.seen_cards.clear()
+                    
+                    self.all_video_detections[vp.name] = set(self.seen_cards)
 
                 # Graceful exit on error, freeing resources
                 except Exception as e:
@@ -339,7 +356,7 @@ class VideoPipeline:
             # All videos processed, finish classification
             self.stop_event.set()
             worker.join()
-        
+
         # Graceful exit on manual interrupt, free all resources
         except KeyboardInterrupt:
             self.stop_event.set()
@@ -355,9 +372,29 @@ class VideoPipeline:
 
         # Log metrics and return results
         total_time = time.time() - all_start
+
+        avg_render_time = self.cumulative_render_time / self.total_frames_processed if self.total_frames_processed else 0.0
+        avg_queue_wait = sum(self.queue_wait_times) / len(self.queue_wait_times) if self.queue_wait_times else 0.0
+        max_queue_wait = max(self.queue_wait_times) if self.queue_wait_times else 0.0
+        min_queue_wait = min(self.queue_wait_times) if self.queue_wait_times else 0.0
+
         if self.logger and logging:
+            print_section_header("Metrics")
             self.logger.info(
                 f"Processed {len(videos)} videos in {total_time:.2f}s | "
-                f"det={self.det_time:.2f}s | clf={self.classifier_worker.clf_time:.2f}s | dispt={self.render_time:.2f}s"
+                f"det_time={self.det_time:.2f}s | clf_time={self.classifier_worker.clf_time:.2f}s | dispt_time={self.cumulative_render_time:.2f}s"
             )
-        return self.all_seen_cards
+            self.logger.info(
+                f"Total frames processed: {self.total_frames_processed} | Skipped frames: {self.skipped_frame_count} | "
+                f"Avg render time: {avg_render_time*1000:.2f} ms"
+            )
+            self.logger.info(
+                f"Detection queue wait times: avg={avg_queue_wait:.3f}s | min={min_queue_wait:.3f}s | max={max_queue_wait:.3f}s | "
+                f"Samples: {len(self.queue_wait_times)}"
+            )
+            if total_time > 0:
+                self.logger.info(
+                    f"Overall pipeline FPS: {self.total_frames_processed / total_time:.2f}"
+                )
+        return self.all_video_detections
+

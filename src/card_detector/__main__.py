@@ -4,6 +4,7 @@ def main():
     from card_detector.config import cfg
     from card_detector.pipeline.screenshot_pipeline import ScreenshotPipeline
     from card_detector.pipeline.video_pipeline import VideoPipeline
+    from card_detector.util.logging import print_section_header
 
     logging.basicConfig(
         format="%(asctime)s [%(levelname)s] %(message)s",
@@ -40,12 +41,15 @@ def main():
 
     if args.mode == "video":
         pipeline = VideoPipeline(yolo_cfg, cnn_cfg, pcfg, logger=logger)
-        logger.info("Starting video pipeline...")
         results = pipeline.process_videos()
         if results is not None:
-            logger.info(results)
-            logger.info(f"Total results from all videos: {len(results)}")
-            logger.warning("There is a minor bug where the video finishes but the classifications are still queued. The above output will always be the full TRUE list.")
+            total = 0
+            print_section_header("Results")
+            for video, cards in results.items():
+                logger.info(f"{video}: {sorted(cards, key=lambda s: (s.split()[0], int(s.split()[1]))) if cards else 'No cards detected.'}")
+                total += len(cards)
+            logger.info(f"Total cards detected: {total}")
+
     else:
         pipeline = ScreenshotPipeline(yolo_cfg, cnn_cfg, pcfg, logger=logger)
         logger.info("Starting pipeline with batch classification...")
