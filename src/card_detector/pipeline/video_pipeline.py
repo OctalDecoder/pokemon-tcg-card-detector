@@ -51,7 +51,6 @@ DEFAULT_DISPLAY_FPS = 30
 DEFAULT_QUEUE_MAXSIZE = 1024
 DEFAULT_VIDEO_EXT = "*.mp4"
 DEFAULT_FPS_WINDOW = 30
-DEFAULT_DETECTION_DISPLAY_SECS = 2.0
 
 class VideoPipeline:
     """Pipeline for real-time card detection from video files."""
@@ -134,7 +133,7 @@ class VideoPipeline:
         self._fps_times: List[float] = []
         self._fps_window: int = DEFAULT_FPS_WINDOW
         self._live_detections: Dict[str, Tuple[str, float]] = {}
-        self._detection_display_secs: float = DEFAULT_DETECTION_DISPLAY_SECS
+        self._detection_display_secs: float = pcfg.get("classification_timer", 3)
         self._overlay_lock = threading.Lock()
 
         # Classifier Worker
@@ -167,7 +166,10 @@ class VideoPipeline:
         if self.show_classifications: 
             now = time.time()
             with self._overlay_lock:
-                expired = [cid for cid, (_, t) in self._live_detections.items() if (now - t) > self._detection_display_secs]
+                display_time = self._detection_display_secs
+                if self.turbo:
+                    display_time = self._detection_display_secs / (self.detection_frame_skip + 1)
+                expired = [cid for cid, (_, t) in self._live_detections.items() if (now - t) > display_time]
                 for cid in expired:
                     del self._live_detections[cid]
                 live_items = list(self._live_detections.values())
