@@ -10,3 +10,6 @@ __pycache__/
 .vscode/
 
 *.db
+
+yolo11n.pt
+yolov8n.pt

@@ -44,7 +44,7 @@ video_pipeline:
   turbo: false # Only processes frames that run detection. Faster with > detection_skip.
   detection_skip: 4 # Saves CPU significantly - skips detection on frames
   classification_skip: 0 # How many deteciton frames to skip, better to tune detection_skip
-  detection_queue_maxsize: 1024 # Backlog of detections, if over this number, don't process detections
+  detection_queue_maxsize: 256 # Backlog of detections, if over this number, don't process detections
 
   # Display and Render
   display_video: true
@@ -56,12 +56,13 @@ video_pipeline:
   show_fps: true
   show_bboxes: false
   show_classifications: true
-  classification_timer: 3
+  classification_timer: 2
 
-# --------- YOLO -----------------------------------------------------------------------------------------
+# --------- YOLO TRAINING -----------------------------------------------------------------------------------------
 yolo:
   data_config: "config/yolo.yaml"
   model_name: "tcgp_card_detector"
+  model: "yolov8n.pt" # Model to use as base. If null defaults to "yolov8n.pt"
   batch_size: 16
   epochs: 25
   img_size: 640
@@ -79,7 +80,7 @@ yolo_datagen:
   allowed_ext: [".png", ".jpg", ".jpeg"]
   variants_per: 100
 
-# --------- CNN ------------------------------------------------------------------------------------------
+# --------- CNN TRAINING ------------------------------------------------------------------------------------------
 cnn:
   batch_size: 32
   weight_decay: 0.02

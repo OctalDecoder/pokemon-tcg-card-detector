@@ -1,6 +1,6 @@
 # Paths to yolo training and evaluation folders
-train: data/yolo/images/train
-val: data/yolo/images/val
+train: ../data/yolo/images/train
+val: ../data/yolo/images/val
 
 # Number of classes
 nc: 2
