@@ -1,0 +1,20 @@
+fixtures_dir: "tests/fixtures"
+videos_dir: "tests/videos"
+detection_accuracy_threshold: 0.90
+
+tests:
+  - video: "test_1.mp4"
+    fixture: "test_1.yaml"
+    min_accuracy: 1.0
+  - video: "test_2.mp4"
+    fixture: "test_2.yaml"
+    min_accuracy: 1.0
+  - video: "test_3.mp4"
+    fixture: "test_3.yaml"
+    min_accuracy: 1.0
+  - video: "test_4.mp4"
+    fixture: "test_4.yaml"
+    min_accuracy: 1.0
+  - video: "test_5.mp4"
+    fixture: "test_5.yaml"
+    min_accuracy: 1.0

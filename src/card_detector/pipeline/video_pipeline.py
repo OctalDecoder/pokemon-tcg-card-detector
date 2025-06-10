@@ -46,7 +46,7 @@ from .screenshot_pipeline import merge_overlapping_boxes
 
 # Module-Level Defaults/Constants
 DEFAULT_CODEC = "mp4v"
-DEFAULT_OUTPUT_SUBDIR = "video_pipeline"
+DEFAULT_OUTPUT_SUBDIR = "video"
 DEFAULT_DISPLAY_FPS = 30
 DEFAULT_QUEUE_MAXSIZE = 1024
 DEFAULT_VIDEO_EXT = "*.mp4"
@@ -182,8 +182,9 @@ class VideoPipeline:
     ) -> Set[str]:
         """Process all `.mp4` files in `video_dir` and return detected cards."""
 
-        print_section_header("Video Pipeline")
-        self.logger.info("Starting video pipeline...")
+        if self.logger:
+            print_section_header("Video Pipeline")
+            self.logger.info("Starting video pipeline...")
 
         video_dir = video_dir or self.pcfg["video_dir"]
         videos = sorted(Path(video_dir).glob(DEFAULT_VIDEO_EXT))
@@ -371,7 +372,12 @@ class VideoPipeline:
                     cv2.destroyAllWindows()
                 except Exception:
                     pass
-
+        
+        if not videos or len(videos) < 1:
+            if self.logger:
+                self.logger.warning(f"No videos found at: {Path(video_dir)}")
+            return self.all_video_detections
+        
         # Log metrics and return results
         total_time = time.time() - all_start
 

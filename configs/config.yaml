@@ -1,19 +1,13 @@
 # --------- SHARED ---------------------------------------------------------------------------------------
 shared:
   # Detection
-  screenshot_dir: "tests/fixtures" # Directory containing screenshots to process
-  video_dir: "tests/videos" # Directory containing videos to process
+  screenshot_dir: "data/fixtures" # Directory containing screenshots to process
+  video_dir: "data/videos" # Directory containing videos to process
 
   # Models
   classifiers: ["fullart", "standard"]
   yolo_model: "models/yolo_card_detector.pt"
   cnn_model_dir: "models/"
-
-  # Training
-  random_seed: 42
-  card_images_dir: "data/raw/cards" # Directory containing labelled cards
-  training_data_dir: "data/"
-  output_dir: "output/"
 
   # General
   debug: false
@@ -24,7 +18,6 @@ screenshot_pipeline:
   use_master_cnn: false # If true, distilled student CNNs are ignored
   yolo_conf_thresh: 0.1
   cnn_conf_thresh: 0.15
-  bbox_iou_thresh: 0.3 # Yolo outputs overlapping by this value will be merged if possible (0 = off)
 
   # Results
   save_results: true
@@ -36,7 +29,7 @@ video_pipeline:
   yolo_conf_thresh: 0.5
   cnn_conf_thresh: 0.5
   bbox_iou_thresh: 0.3
-  cnn_batch_size: 8
+  cnn_batch_size: 5
 
   # Performance tuning
   phashing_enabled: true # Hash detections to ignore duplicates, more cpu load, less gpu, less time
@@ -54,47 +47,6 @@ video_pipeline:
   recording_fps: null # null to use videos original fps (turbo overrides this)
 
   show_fps: true
-  show_bboxes: false
+  show_bboxes: true
   show_classifications: true
   classification_timer: 2
-
-# --------- YOLO TRAINING -----------------------------------------------------------------------------------------
-yolo:
-  data_config: "config/yolo.yaml"
-  model_name: "tcgp_card_detector"
-  model: "yolov8n.pt" # Model to use as base. If null defaults to "yolov8n.pt"
-  batch_size: 16
-  epochs: 25
-  img_size: 640
-  device: 0
-  lr0: 0.001
-  lr_final_factor: 0.01
-  patience: 5
-
-yolo_datagen:
-  source_dir: "images/cards"
-  background_dir: "images/backgrounds"
-  output_img_dir: "data/yolo/images/train"
-  output_label_dir: "data/yolo/labels/train"
-  val_split: 0.2
-  allowed_ext: [".png", ".jpg", ".jpeg"]
-  variants_per: 100
-
-# --------- CNN TRAINING ------------------------------------------------------------------------------------------
-cnn:
-  batch_size: 32
-  weight_decay: 0.02
-  lr_master: 0.0003
-  lr_student: 0.0002
-  t_kd: 4.0
-  alpha_ce: 0.2
-  img_size: 224
-
-cnn_datagen:
-  source_dir: "images/cards"
-  output_train_dir: "data/cnn/train"
-  output_val_dir: "data/cnn/val"
-  val_split: 0.2
-  allowed_ext: [".png", ".jpg", ".jpeg"]
-  variants_per: 120
-  random_seed: 132
