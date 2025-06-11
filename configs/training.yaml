@@ -17,6 +17,8 @@ yolo:
   patience: 5
 
 cnn:
+  epochs_master: 25
+  epochs_student: 15
   batch_size: 32
   weight_decay: 0.02
   lr_master: 0.0003
