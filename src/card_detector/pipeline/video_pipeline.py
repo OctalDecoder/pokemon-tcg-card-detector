@@ -384,7 +384,7 @@ class VideoPipeline:
             print_section_header("Metrics")
             self.logger.info(
                 f"Processed {len(videos)} videos in {total_time:.2f}s | "
-                f"det_time={self.det_time:.2f}s | clf_time={self.classifier_worker.clf_time:.2f}s | dispt_time={self.cumulative_render_time:.2f}s"
+                f"det_time={self.yolo.det_time:.2f}s | crop_time={self.yolo.crop_time:.2f}s | clf_time={self.classifier_worker.clf_time:.2f}s | dispt_time={self.cumulative_render_time:.2f}s"
             )
             self.logger.info(
                 f"Total frames processed: {self.total_frames_processed} | Skipped frames: {self.skipped_frame_count} | "
