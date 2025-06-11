@@ -1,6 +1,7 @@
 # 🃏 Pokemon TCG Pocket Card Detection
 
 ## 📋 Table of Contents
+
 - [Project Summary](#-project-summary)
 - [Overview & Examples](#-overview--examples)
 - [Repository Setup Guide (WIP)](#-repository-setup-guide-wip)
@@ -97,19 +98,35 @@ _Battle Screenshot_
 
 _Card Dex Screenshot_
 
-
 ## 📁 Repository Setup Guide (WIP)
 
-> **This guide describes how to configure, structure, and use this repo.** 
-> _WIP: Feedback and edits welcome!_
+> **This guide describes how to configure, structure, and use this repo.** > _WIP: Feedback and edits welcome!_
 
 ### 1. Prerequisites
+
 ---
+
 - Python ≥ 3.12
 - `git` (for cloning, version control)
 
+#### Install PyTorch with CUDA (if you have an NVIDIA GPU)
+
+Go to [PyTorch Get Started](https://pytorch.org/get-started/locally/) and select your CUDA version.
+Example for CUDA 12.1:
+
+```sh
+# Determine cuda version (see top right of output)
+nvidia-smi
+
+# If cuda is avaliable (example, copy from pytorch website)
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+
+# If cuda is not avaliable, or if unsure
+pip install torch torchvision
+```
 
 ### 2. Installation
+
 ---
 
 ```bash
@@ -121,8 +138,8 @@ cd pokemon-tcg-card-detector
 pip install -e .
 ```
 
-
 ### 3. Screenshots & Videos
+
 ---
 
 - Place images to be processed in:
@@ -132,8 +149,8 @@ pip install -e .
 - **To change these locations:**
   Edit `config.yaml` → `shared` → `screenshot_dir` or `video_dir`.
 
-
 ### 4. Data & Intermediate Model Files
+
 ---
 
 - TCG card images used for training are to be placed in:
@@ -141,18 +158,20 @@ pip install -e .
 - All temporary checkpoints, embeddings, and intermediate files are created in:
   `data/`
 
-
 ### 5. Database Setup
+
 ---
+
 > TODO: Rework this section
+
 - **Download or obtain** the database (`cards.db`) from \[TBD download link or instructions].
 - Place it in:
   `models/cards.db`
 - **To change this location:**
   Edit `config.yaml` → `shared` → `database`
 
-
 ### 6. Configuration Structure
+
 ---
 
 - The main configuration file is `config.yaml`.
@@ -162,8 +181,8 @@ pip install -e .
   - **Override priority:**
     `shared` values are populated into all other sections. These individual config sections (e.g., `yolo`, `cnn`) take precedence over `shared` for conflicting values.
 
-
 ### 7. Card Image Directory & Naming Convention
+
 ---
 
 > **Card images of high quality should be labelled and stored here for model training.**
@@ -184,8 +203,8 @@ data/raw/cards/fullart/S5 100.png
 
 > Note: These subfolders represent the `yolov8n` model deteciton labels. Can have as many as needed so long as they are organised and configured. The project is set up to automatically train `student CNN` models, one per detection label.
 
-
 ### 8. Output Directories
+
 ---
 
 - By default, processed images, results, generated data, trained models, and test runs are saved to:
@@ -194,9 +213,10 @@ data/raw/cards/fullart/S5 100.png
 
 - Subdirectories (e.g., `output/yolo/`) are automatically created as needed.
 
-
 ### 9. Running the Pipeline
+
 ---
+
 The following commands are provided for convinience, use the `--help` tag for more information
 
 ```bash
@@ -217,7 +237,9 @@ cdt train --help
 ```
 
 ### 10. Work-in-Progress Notes
+
 ---
+
 > To comply with the Pokémon TCG Pocket Terms of Use, this project does not include or distribute any official game assets. Users must obtain their own card data and images from within the game.
 
 - Documentation is evolving; structure and locations may shift.

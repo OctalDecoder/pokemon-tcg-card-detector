@@ -17,8 +17,6 @@ dependencies = [
     "pyyaml",
     "Pillow",
     "requests",
-    "torch",
-    "torchvision",
     "ultralytics",
 ]
 
