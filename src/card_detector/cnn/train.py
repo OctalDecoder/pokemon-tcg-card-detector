@@ -355,7 +355,11 @@ def distil_student(category: str, teacher_ckpt: Path, epochs: int, device: str, 
     in_features_t = teacher.classifier[1].in_features
     teacher.classifier[1] = nn.Linear(in_features_t, num_classes)
     # Load the master model weights (except final layer) into teacher model
-    teacher_ckpt_data = torch.load(teacher_ckpt, map_location=device)
+    try:
+        teacher_ckpt_data = torch.load(teacher_ckpt, map_location=device)
+    except FileNotFoundError:
+        logger.error(f"Failed to load teacher model. File not found: {teacher_ckpt}")
+        return 0
     # Remove any classifier weights from checkpoint to avoid size mismatch
     teacher_ckpt_data.pop("classifier.1.weight", None)
     teacher_ckpt_data.pop("classifier.1.bias", None)
@@ -458,6 +462,9 @@ def train_cnn(args, logger=None):
         import time
         start_c = time.time()
         best_val = distil_student(cat, MASTER_CKPT, epochs_student, device, logger=logger)
+        if best_val is None:
+            logger.error(f"Error training student: {cat}")
+            continue
         elapsed_c = time.time() - start_c
         # Format elapsed time for this category
         hours_c = int(elapsed_c // 3600); minutes_c = int((elapsed_c % 3600) // 60); seconds_c = elapsed_c % 60
