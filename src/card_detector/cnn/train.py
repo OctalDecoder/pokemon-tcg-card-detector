@@ -378,7 +378,7 @@ def distil_student(category: str, teacher_ckpt: Path, epochs: int, device: str, 
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
 
     best_val_acc = 0.0
-    student_ckpt = DATA_ROOT / f"cnn_{category}_student.pth"
+    student_ckpt = OUTPUT_DIR / f"cnn_{category}_student.pth"
 
     # Distillation training loop
     try:
