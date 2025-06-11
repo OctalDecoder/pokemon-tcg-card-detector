@@ -104,11 +104,7 @@ def print_video_pipeline_metrics(video_pipeline, extra_metrics=None):
     right_width = max(len(str(val)) for _, val in metrics) + 2
     border = "+" + "-" * left_width + "+" + "-" * right_width + "+"
 
-    # Table output with section headers centered
     print(border)
-    print(f"| {'Metric'.ljust(left_width-1)}| {'Value'.ljust(right_width-1)}|")
-    print(border)
-    
     first_header = True
     for name, val in metrics:
         if name.startswith("==="):
