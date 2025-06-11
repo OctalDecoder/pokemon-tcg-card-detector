@@ -25,6 +25,7 @@ dependencies = [
 [project.scripts]
 card-detector = "card_detector.__main__:main"
 cdt = "card_detector.__main__:main"
+datagen = "card_detector.cnn.generate_data:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
