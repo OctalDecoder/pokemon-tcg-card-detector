@@ -1,4 +1,4 @@
-"""yolo/generate_data.py
+"""cnn/generate_data.py
 
 Utility script for generating the data used to train the CNN models.
 """

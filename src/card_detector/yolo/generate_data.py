@@ -6,20 +6,22 @@ Utility script for generating the data used to train the YOLOv8 model.
 import os
 import glob
 import random
-from PIL import Image
+import numpy as np
+from PIL import Image, ImageEnhance
 from concurrent.futures import ProcessPoolExecutor
+import math
 
 # ─── CONFIGURATION ─────────────────────────────────────────────────────────────
-CARDS_FULLART_DIR        = 'images/cards/fullart'
-CARDS_STANDARD_DIR       = 'images/cards/standard'
-TEMPLATES_DIR            = 'images/screenshots/backgrounds'
+CARDS_FULLART_DIR        = 'data/data_gen/cards/fullart'
+CARDS_STANDARD_DIR       = 'data/data_gen/cards/standard'
+TEMPLATES_DIR            = 'data/data_gen/backgrounds'
 
-OUTPUT_IMG_DIR           = 'dataset/yolo/images/train'
-OUTPUT_IMG_DIR_VAL       = 'dataset/yolo/images/val'
-OUTPUT_LABEL_DIR         = 'dataset/yolo/labels/train'
-OUTPUT_LABEL_DIR_VAL     = 'dataset/yolo/labels/val'
+OUTPUT_IMG_DIR           = 'output/yolo/images/train'
+OUTPUT_IMG_DIR_VAL       = 'output/yolo/images/val'
+OUTPUT_LABEL_DIR         = 'output/yolo/labels/train'
+OUTPUT_LABEL_DIR_VAL     = 'output/yolo/labels/val'
 
-COMPONENTS_DIR           = 'images/screenshots/backgrounds/components'
+COMPONENTS_DIR           = 'data/data_gen/backgrounds/components'
 COMPONENT_OVERLAY_PROB   = 0.2            # 20% of cards get a snippet
 COMPONENT_SCALE_RANGE    = (0.5, 0.9)     # snippet size relative to card width
 COMPONENT_AMOUNT         = 1              # how many snippets per decorated card
@@ -39,6 +41,13 @@ OFFSCREEN_CHANCE = 0.35
 OFFSCREEN_MAX = 0.90
 OFFSCREEN_MIN = 0.10
 
+# Color jitter params
+COLOR_JITTER = dict(
+    brightness=0.2,  # +/- 20%
+    contrast=0.2,
+    saturation=0.15,
+    hue=0.1
+)
 
 # ─── PRELOAD FILE LISTS ────────────────────────────────────────────────────────
 fullart_paths = glob.glob(os.path.join(CARDS_FULLART_DIR, '*.png'))
@@ -71,14 +80,37 @@ os.makedirs(OUTPUT_LABEL_DIR, exist_ok=True)
 os.makedirs(OUTPUT_IMG_DIR_VAL, exist_ok=True)
 os.makedirs(OUTPUT_LABEL_DIR_VAL, exist_ok=True)
 
+def apply_color_jitter(img):
+    """Apply brightness, contrast, saturation, and hue jitter in PIL (in-place)."""
+    # Random brightness
+    if COLOR_JITTER['brightness'] > 0:
+        factor = 1 + random.uniform(-COLOR_JITTER['brightness'], COLOR_JITTER['brightness'])
+        img = ImageEnhance.Brightness(img).enhance(factor)
+    # Random contrast
+    if COLOR_JITTER['contrast'] > 0:
+        factor = 1 + random.uniform(-COLOR_JITTER['contrast'], COLOR_JITTER['contrast'])
+        img = ImageEnhance.Contrast(img).enhance(factor)
+    # Random saturation
+    if COLOR_JITTER['saturation'] > 0:
+        img = img.convert('RGB')
+        factor = 1 + random.uniform(-COLOR_JITTER['saturation'], COLOR_JITTER['saturation'])
+        img = ImageEnhance.Color(img).enhance(factor)
+    # Random hue (PIL can't do this natively, so approximate)
+    if COLOR_JITTER['hue'] > 0:
+        img = img.convert('HSV')
+        np_img = np.array(img)
+        h_shift = int(255 * random.uniform(-COLOR_JITTER['hue'], COLOR_JITTER['hue']))
+        np_img[..., 0] = (np_img[..., 0] + h_shift) % 255
+        img = Image.fromarray(np_img, mode='HSV').convert('RGB')
+    return img
 
 def boxes_overlap(b1, b2):
     x11, y11, x12, y12 = b1
     x21, y21, x22, y22 = b2
     return not (x12 <= x21 or x11 >= x22 or y12 <= y21 or y11 >= y22)
 
-
 def generate_sample(sample_idx):
+    import numpy as np
     random.seed(sample_idx)
     tmpl_path = random.choice(template_paths)
     tmpl_orig = Image.open(tmpl_path).convert('RGB')
@@ -94,58 +126,64 @@ def generate_sample(sample_idx):
             card = Image.open(path).convert('RGBA')
             w, h = card.size
 
-            # scale card
-            scale = min(
-                random.uniform(*SIZE_REL_RANGE) * orig_w / w,
-                random.uniform(*SIZE_REL_RANGE) * orig_h / h
-            )
-            new_w, new_h = int(w * scale), int(h * scale)
-            card_resized = card.resize((new_w, new_h), Image.LANCZOS)
+            # --- Augmentation: Color jitter
+            card_aug = apply_color_jitter(card.convert('RGB')).convert('RGBA')
 
-            # try placements
+            # --- Augmentation: 0-360 deg rotation
+            angle = random.uniform(0, 360)
+            card_rot = card_aug.rotate(angle, expand=True, resample=Image.BICUBIC)
+            rot_w, rot_h = card_rot.size
+
+            # --- Scaling (relative to template)
+            scale = min(
+                random.uniform(*SIZE_REL_RANGE) * orig_w / rot_w,
+                random.uniform(*SIZE_REL_RANGE) * orig_h / rot_h
+            )
+            new_w, new_h = int(rot_w * scale), int(rot_h * scale)
+            card_final = card_rot.resize((new_w, new_h), Image.LANCZOS)
+
+            # Compute AABB after rotation (for overlap/placement)
+            # For overlap checking, use the proposed placement rectangle
+
+            # Try placements
+            placed = False
             for _ in range(10):
-                # decide off-screen placement (35% chance)
-                if random.random() < 0.35:
-                    # x always fully on screen
+                # Decide off-screen placement (35% chance)
+                if random.random() < OFFSCREEN_CHANCE:
                     x1 = random.randint(0, orig_w - new_w)
                     # top or bottom?
                     if random.random() < 0.5:
-                        # off-screen at top between 10%-90%
                         y1 = random.randint(
-                            -int(new_h * 0.90),
-                            -int(new_h * 0.10)
+                            -int(new_h * OFFSCREEN_MAX),
+                            -int(new_h * OFFSCREEN_MIN)
                         )
                     else:
-                        # off-screen at bottom between 10%-90%
                         y1 = random.randint(
-                            orig_h - new_h + int(new_h * 0.10),
-                            orig_h - new_h + int(new_h * 0.90)
+                            orig_h - new_h + int(new_h * OFFSCREEN_MIN),
+                            orig_h - new_h + int(new_h * OFFSCREEN_MAX)
                         )
                 else:
-                    # fully on-screen placement
                     x1 = random.randint(0, orig_w - new_w)
                     y1 = random.randint(0, orig_h - new_h)
 
                 x2, y2 = x1 + new_w, y1 + new_h
 
-                # clamp to visible box
+                # Clamp to visible box
                 vis_x1 = max(0, x1)
                 vis_y1 = max(0, y1)
                 vis_x2 = min(orig_w, x2)
                 vis_y2 = min(orig_h, y2)
 
-                # ensure theres still something visible
+                # Overlap check and size sanity
                 if vis_x2 > vis_x1 and vis_y2 > vis_y1 and \
-                all(not boxes_overlap((vis_x1, vis_y1, vis_x2, vis_y2), ann[:4])
-                    for ann in annotations):
-
-                    # record only the visible portion
+                   all(not boxes_overlap((vis_x1, vis_y1, vis_x2, vis_y2), ann[:4]) for ann in annotations):
+                    # Record only the visible portion (YOLO only "sees" the visible part)
                     annotations.append((vis_x1, vis_y1, vis_x2, vis_y2, cls))
 
-                    # paste the full card (so off-screen parts remain hidden)
-                    tmpl_orig.paste(card_resized, (x1, y1), card_resized)
+                    # Paste card (rotated+colored) on template
+                    tmpl_orig.paste(card_final, (x1, y1), card_final)
 
-                    # optional UI snippet overlay
+                    # Optionally overlay UI snippet(s)
                     if random.random() < COMPONENT_OVERLAY_PROB:
                         for __ in range(COMPONENT_AMOUNT):
                             comp_path = random.choice(component_paths)
@@ -154,13 +192,14 @@ def generate_sample(sample_idx):
                             comp_scale = random.uniform(*COMPONENT_SCALE_RANGE) * new_w / cw
                             comp_w, comp_h = int(cw * comp_scale), int(ch * comp_scale)
                             comp_resized = comp.resize((comp_w, comp_h), Image.LANCZOS)
-
-                            cx = random.randint(x1, x2 - comp_w)
-                            cy = random.randint(y1, y2 - comp_h)
-                            tmpl_orig.paste(comp_resized, (cx, cy), comp_resized)
-
+                            if (x2 - comp_w) >= x1 and (y2 - comp_h) >= y1:
+                                cx = random.randint(x1, x2 - comp_w)
+                                cy = random.randint(y1, y2 - comp_h)
+                                tmpl_orig.paste(comp_resized, (cx, cy), comp_resized)
+                    placed = True
                     break  # done placing this card
-
+            if not placed:
+                continue  # couldn't place card without overlap
 
     # letterbox‐resize to TARGET_SIZE
     target_w, target_h = TARGET_SIZE
@@ -211,10 +250,12 @@ def generate_sample(sample_idx):
 
     return sample_idx
 
-
-if __name__ == '__main__':
+def main():
     with ProcessPoolExecutor() as executor:
         for idx in executor.map(generate_sample, range(NUM_SAMPLES)):
             if (idx + 1) % 100 == 0:
                 print(f"Generated {idx+1}/{NUM_SAMPLES} samples")
     print('Data generation complete.')
+
+if __name__ == "__main__":
+    main()

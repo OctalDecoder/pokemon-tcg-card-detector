@@ -5,7 +5,7 @@ shared:
   output_dir: "output/"
 
 yolo:
-  data_config: "config/yolo_training_data.yaml"
+  data_config: "configs/yolo_training_data.yaml"
   model_name: "tcgp_card_detector"
   model: "yolov8n.pt" # Model to use as base. If null defaults to "yolov8n.pt"
   batch_size: 16

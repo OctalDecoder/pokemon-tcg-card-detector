@@ -426,14 +426,14 @@ def train_cnn(args, logger=None):
     """
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
+    epochs_master = args.epochs_master if args.epochs_master is not None else CONFIG["epochs_master"]
+    epochs_student = args.epochs_student if args.epochs_student is not None else CONFIG["epochs_student"]
     # Train master model if required
     if not args.student_only:
         logger.info("Training master model...") if logger else print("Training master model...")
         import time
         start_time = time.time()
         
-        epochs_master = args.epochs_master if args.epochs_master is not None else CONFIG["epochs_master"]
-        epochs_student = args.epochs_student if args.epochs_student is not None else CONFIG["epochs_student"]
         
         best_master_acc = train_master(epochs_master, device, resume_master=args.resume_master, logger=logger)
         elapsed = time.time() - start_time
