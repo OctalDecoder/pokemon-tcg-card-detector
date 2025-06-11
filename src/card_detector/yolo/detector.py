@@ -18,8 +18,6 @@ class YoloDetector:
             device=device,
             verbose=debug
         )
-        
-        print("YOLO device:", next(self.model.model.parameters()).device)
     
     def detect(self, image):
         det_start = time.time()

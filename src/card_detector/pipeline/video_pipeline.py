@@ -41,7 +41,7 @@ from card_detector.cnn.classifier import CnnClassifier
 from card_detector.cnn.video_classification import ClassifierWorker
 from card_detector.yolo.detector import YoloDetector
 from card_detector.ui.video_overlay import draw_fps_overlay, draw_live_detections_overlay, draw_bounding_box
-from card_detector.util.logging import print_section_header
+from card_detector.util.logging import print_section_header, print_video_pipeline_settings
 from .screenshot_pipeline import merge_overlapping_boxes
 
 # Module-Level Defaults/Constants
@@ -182,8 +182,12 @@ class VideoPipeline:
     ) -> Set[str]:
         """Process all `.mp4` files in `video_dir` and return detected cards."""
 
-        print_section_header("Video Pipeline")
-        self.logger.info("Starting video pipeline...")
+        if self.logger:
+            print_section_header("Pipeline Configuration")
+            print_video_pipeline_settings(self.logger, self)
+
+            print_section_header("Video Pipeline")
+            self.logger.info("Starting video pipeline...")
 
         video_dir = video_dir or self.pcfg["video_dir"]
         videos = sorted(Path(video_dir).glob(DEFAULT_VIDEO_EXT))
@@ -191,6 +195,7 @@ class VideoPipeline:
         all_start = time.time()
         worker = threading.Thread(target=self._worker_loop, daemon=True)
         worker.start()
+        
 
         try:
             for vp in videos:
