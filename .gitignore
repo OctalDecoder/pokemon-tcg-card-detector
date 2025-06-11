@@ -7,6 +7,8 @@ tests/videos
 __pycache__/
 *.pyc
 
+.pytest_cache/
+
 .vscode/
 
 *.db

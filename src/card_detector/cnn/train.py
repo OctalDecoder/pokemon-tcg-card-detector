@@ -25,9 +25,9 @@ from torchvision.models import (
     mobilenet_v3_small, MobileNet_V3_Small_Weights,
 )
 
-from card_detector.config import cfg
+from card_detector.config import load_config
 
-CONFIG = cfg["cnn"]
+CONFIG = load_config(config_path='training.yaml', section="cnn")
 
 BATCH_SIZE    = CONFIG["batch_size"]
 WEIGHT_DECAY  = CONFIG["weight_decay"]
@@ -269,31 +269,22 @@ def distil_student(cat: str, teacher_ckpt: Path, epochs: int, device: str):
             print("    ↳ best saved")
     print(f"Finished '{cat}' - best val {best:.3f}")
 
-# ─────────────── CLI & main ───────────────
-
-def parse_args():
-    p = argparse.ArgumentParser()
-    p.add_argument("--epochs-master", type=int, default=10)
-    p.add_argument("--epochs-student", type=int, default=6)
-    p.add_argument("--student-only", action="store_true")
-    p.add_argument("--resume-master", action="store_true",
-                   help="Load and continue training from existing master checkpoint")
-    return p.parse_args()
-
-def main():
-    args = parse_args()
+# ─────────────── Main Function ───────────────
+def train_cnn(args, logger=None):
     device = "cuda" if torch.cuda.is_available() else "cpu"
+    # This is called with argparse.Namespace `args` from main
     if not args.student_only:
-        print("Training master ...")
+        if logger: logger.info("Training master ...")
+        else: print("Training master ...")
         train_master(args.epochs_master, device, args.resume_master)
     else:
         assert MASTER_CKPT.exists(), "Master checkpoint missing. Run without --student-only first."
     cats = list_subcategories(TRAIN_DIR)
-    print("Sub-categories detected:", ", ".join(cats))
+    if logger: logger.info(f"Sub-categories detected: {', '.join(cats)}")
+    else: print("Sub-categories detected:", ", ".join(cats))
     for c in cats:
-        print(f"\nDistilling {c} ...")
+        if logger: logger.info(f"Distilling {c} ...")
+        else: print(f"\nDistilling {c} ...")
         distil_student(c, MASTER_CKPT, args.epochs_student, device)
-    print("\nAll students distilled ✔")
-
-if __name__ == "__main__":
-    main()
+    if logger: logger.info("All students distilled ✔")
+    else: print("\nAll students distilled ✔")

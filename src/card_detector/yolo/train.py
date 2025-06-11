@@ -3,8 +3,6 @@
 Training script for a YOLOv8 nano model
 """
 
-
-
 def train(args, logger):
     """
     Train a YOLOv8 model, using either config or CLI overrides.
