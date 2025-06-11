@@ -29,7 +29,7 @@ import threading
 import shutil
 from collections import deque
 from pathlib import Path
-from queue import Empty, Queue, Full
+from queue import Queue, Full
 from typing import Optional, Set, Tuple, List, Dict
 
 import cv2
