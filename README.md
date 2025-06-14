@@ -5,7 +5,7 @@
 - [Project Summary](#-project-summary)
 - [Overview & Examples](#-overview--examples)
 - [Repository Setup Guide (WIP)](#-repository-setup-guide-wip)
-- [Extra Notes](#-extra-notes)
+- [License](#license)
 
 ## 🚀 Project Summary
 
