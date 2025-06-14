@@ -9,7 +9,6 @@ class YoloDetector:
         self.device = device  # Save the device string
         self.debug = debug
         self.det_time = 0.0
-        self.crop_time = 0.0
         
         # Move model onto GPU at load time
         _ = self.model.predict(
@@ -29,7 +28,6 @@ class YoloDetector:
         )
         self.det_time += time.time() - det_start
         
-        crop_start = time.time()
         bboxes = []
         yolo_names = self.model.model.names
         for r in results:
@@ -40,5 +38,4 @@ class YoloDetector:
                 cy = (y1 + y2) / 2
                 cat = yolo_names[y]
                 bboxes.append((x1, y1, x2, y2, cx, cy, cat))
-        self.crop_time += time.time() - crop_start
         return bboxes

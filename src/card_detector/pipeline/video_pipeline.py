@@ -29,7 +29,7 @@ import threading
 import shutil
 from collections import deque
 from pathlib import Path
-from queue import Empty, Queue, Full
+from queue import Queue, Full
 from typing import Optional, Set, Tuple, List, Dict
 
 import cv2
@@ -41,7 +41,7 @@ from card_detector.cnn.classifier import CnnClassifier
 from card_detector.cnn.video_classification import ClassifierWorker
 from card_detector.yolo.detector import YoloDetector
 from card_detector.ui.video_overlay import draw_fps_overlay, draw_live_detections_overlay, draw_bounding_box
-from card_detector.util.logging import print_section_header, print_video_pipeline_settings
+from card_detector.util.logging import print_section_header, print_video_pipeline_settings, print_video_pipeline_metrics
 from .screenshot_pipeline import merge_overlapping_boxes
 
 # Module-Level Defaults/Constants
@@ -113,8 +113,10 @@ class VideoPipeline:
         self.detection_queue: "Queue[Tuple[Image.Image, str, float]]" = Queue(maxsize=self.queue_maxsize)
         self.seen_cards: Set[str] = set()
         self.all_video_detections = {}
+        self.total_time = 0.0
         self.frame_idx = 0
         self.det_time = 0.0
+        self.crop_time = 0.0
         self.render_time = 0.0
         self.cumulative_render_time = 0.0  # Sum of render times
         self.stop_event = threading.Event()
@@ -123,6 +125,11 @@ class VideoPipeline:
         self.skipped_frame_count = 0
         self.queue_wait_times = []  # Track queue wait times (sec)
         self.total_frames_processed = 0
+        self.total_detections = 0
+        self.total_merged_detection = 0
+        self.phash_time = 0
+        self.total_classifications_queued = 0
+        self.detected_frames = 0
 
         # Perceptual Hashing
         self.phashing_enabled = pcfg.get("phashing_enabled", False)
@@ -184,7 +191,7 @@ class VideoPipeline:
 
         if self.logger:
             print_section_header("Pipeline Configuration")
-            print_video_pipeline_settings(self.logger, self)
+            print_video_pipeline_settings(self)
 
             print_section_header("Video Pipeline")
             self.logger.info("Starting video pipeline...")
@@ -248,18 +255,23 @@ class VideoPipeline:
 
                         # YOLOv8 Detection Pipeline
                         if self.frame_idx % self.detection_frame_skip == 0:
+                            self.detected_frames += 1
                             det_start = time.time()
                             bboxes = self.yolo.detect(frame)
+                            self.total_detections += len(bboxes)
                             bboxes = merge_overlapping_boxes(
                                 bboxes, iou_thresh=self.pcfg["bbox_iou_thresh"]
                             )
+                            self.total_merged_detection += len(bboxes)
                             for x1, y1, x2, y2, *_rest, cat in bboxes:
                                 if self.show_bboxes and self.display_video:
                                     draw_bounding_box(frame, (x1, y1, x2, y2), str(cat))
 
                                 # Crop detections and queue for CNN classification
+                                crop_start = time.time()
                                 x1_, y1_, x2_, y2_ = map(int, (x1, y1, x2, y2))
                                 bgr_crop = frame[y1_:y2_, x1_:x2_]
+                                self.crop_time += time.time() - crop_start
                                 if bgr_crop.size != 0:
                                     rgb_crop = cv2.cvtColor(bgr_crop, cv2.COLOR_BGR2RGB)
                                     pil_crop = Image.fromarray(rgb_crop)
@@ -267,6 +279,7 @@ class VideoPipeline:
                                     # Perceptual Hashing
                                     is_duplicate_crop = False
                                     if self.phashing_enabled:
+                                        phash_start = time.time()
                                         crop_phash = imagehash.phash(pil_crop)
                                         is_duplicate_crop = any(
                                             crop_phash - prev_hash <= self.phash_hamming_thresh
@@ -274,12 +287,14 @@ class VideoPipeline:
                                         )
                                         if not is_duplicate_crop:
                                             self.crop_phash_buffer.append(crop_phash)
+                                        self.phash_time += time.time() - phash_start
 
                                     # Queue for CNN if queue has room
                                     if not is_duplicate_crop:
                                         enqueue_time = time.time()
                                         try:
                                             self.detection_queue.put_nowait((pil_crop, cat, enqueue_time))
+                                            self.total_classifications_queued += 1
                                         except Full:
                                             if self.logger:
                                                 self.logger.warning(
@@ -377,31 +392,10 @@ class VideoPipeline:
                 except Exception:
                     pass
 
+        self.total_time = time.time() - all_start
+        
         # Log metrics and return results
-        total_time = time.time() - all_start
-
-        avg_render_time = self.cumulative_render_time / self.total_frames_processed if self.total_frames_processed else 0.0
-        avg_queue_wait = sum(self.queue_wait_times) / len(self.queue_wait_times) if self.queue_wait_times else 0.0
-        max_queue_wait = max(self.queue_wait_times) if self.queue_wait_times else 0.0
-        min_queue_wait = min(self.queue_wait_times) if self.queue_wait_times else 0.0
-
-        if self.logger and logging:
-            print_section_header("Metrics")
-            self.logger.info(
-                f"Processed {len(videos)} videos in {total_time:.2f}s | "
-                f"det_time={self.yolo.det_time:.2f}s | crop_time={self.yolo.crop_time:.2f}s | clf_time={self.classifier_worker.clf_time:.2f}s | dispt_time={self.cumulative_render_time:.2f}s"
-            )
-            self.logger.info(
-                f"Total frames processed: {self.total_frames_processed} | Skipped frames: {self.skipped_frame_count} | "
-                f"Avg render time: {avg_render_time*1000:.2f} ms"
-            )
-            self.logger.info(
-                f"Detection queue wait times: avg={avg_queue_wait:.3f}s | min={min_queue_wait:.3f}s | max={max_queue_wait:.3f}s | "
-                f"Samples: {len(self.queue_wait_times)}"
-            )
-            if total_time > 0:
-                self.logger.info(
-                    f"Overall pipeline FPS: {self.total_frames_processed / total_time:.2f}"
-                )
+        print_section_header("Metrics")
+        print_video_pipeline_metrics(self)
         return self.all_video_detections
 
