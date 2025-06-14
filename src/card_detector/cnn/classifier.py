@@ -48,7 +48,7 @@ class CnnClassifier:
             transforms.Normalize(mean=[.485, .456, .406], std=[.229, .224, .225]),
         ])
         self._load_models(cnn_model_dir)
-
+        
     def _load_models(self, cnn_model_dir):
         with open(f"{cnn_model_dir}/cnn_mappings.json") as f:
             raw = json.load(f)
