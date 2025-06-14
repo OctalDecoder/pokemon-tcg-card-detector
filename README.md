@@ -201,7 +201,7 @@ data/raw/cards/standard/A2b 32.png
 data/raw/cards/fullart/S5 100.png
 ```
 
-> Note: These subfolders represent the `yolov8n` model deteciton labels. Can have as many as needed so long as they are organised and configured. The project is set up to automatically train `student CNN` models, one per detection label.
+> Note: These subfolders represent the `yolov8n` model detection labels. Can have as many as needed so long as they are organised and configured. The project is set up to automatically train `student CNN` models, one per detection label.
 
 ### 8. Output Directories
 
@@ -256,6 +256,16 @@ cdt train --help
 | Database file             | `models/cards.db` | `shared.database`        |
 | Output/results            | `output/`         | `shared.output_dir`      |
 
+> By combining **pHash caching**, **pruned+quantized distilled CNNs**, and an **asynchronous pipelined architecture**, we'll minimize redundant CNN inferences, squeeze maximum throughput out of the GPU, and aim to keep peak frame time under ~100 ms even when dozens of cards appear simultaneously.
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
+
+The MIT License permits use, modification, and distribution of this software, including for commercial purposes, provided the original copyright notice and license text are included.
+
+By using or contributing to this project, you agree to comply with the terms of the MIT License.
+
 ---
 
-By combining **pHash caching**, **pruned+quantized distilled CNNs**, and an **asynchronous pipelined architecture**, we’ll minimize redundant CNN inferences, squeeze maximum throughput out of the GPU, and aim to keep peak frame time under ~100 ms even when dozens of cards appear simultaneously.
+For any questions about licensing or contributions, please contact the project maintainers.
