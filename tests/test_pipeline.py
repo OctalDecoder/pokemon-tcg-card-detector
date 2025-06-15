@@ -45,7 +45,6 @@ def pipeline_results():
     pcfg["turbo"] = True
 
     pipeline = VideoPipeline(yolo_cfg, cnn_cfg, pcfg)
-    # Only run once for all videos!
     return pipeline.process_videos(video_dir=videos_dir, logging=False)
 
 @pytest.mark.parametrize(
