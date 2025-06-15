@@ -2,7 +2,7 @@
 shared:
   # Detection
   screenshot_dir: "data/fixtures" # Directory containing screenshots to process
-  video_dir: "tests/videos" # Directory containing videos to process
+  video_dir: "data/videos" # Directory containing videos to process
 
   # Models
   classifiers: ["fullart", "standard"]
