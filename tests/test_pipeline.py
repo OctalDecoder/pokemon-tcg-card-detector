@@ -62,4 +62,13 @@ def test_pipeline_detections(video_file, fixture_file, min_accuracy, pipeline_re
     accuracy = jaccard_index(preds, expected)
     print(f"\nDetected: {len(preds)}, Expected: {len(expected)}, Jaccard: {accuracy:.3f}")
 
+    if accuracy < min_accuracy:
+        missing = expected - preds
+        extra = preds - expected
+        print(
+            f"Accuracy {accuracy:.2f} below threshold {min_accuracy:.2f}\n"
+            f"Missing items: {sorted(missing)}\n"
+            f"Unexpected items: {sorted(extra)}"
+        )
+    
     assert accuracy >= min_accuracy, f"Accuracy {accuracy:.2f} below threshold {min_accuracy:.2f}"

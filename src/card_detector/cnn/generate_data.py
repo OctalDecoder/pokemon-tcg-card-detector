@@ -45,6 +45,14 @@ augmentor = A.Compose([
     A.OneOf([
         A.Resize(224, 224),
         A.RandomResizedCrop(size=(224,224), scale=(0.5,1.0), ratio=(0.8,1.2)),
+        A.Sequential([
+            A.Resize(64, 64),    # Downscale then restore
+            A.Resize(224, 224),
+        ]),
+        A.Sequential([
+            A.Downscale(scale_min=0.25, scale_max=0.5, interpolation=0),  # Albumentations has this!
+            A.Resize(224, 224),
+        ]),
     ], p=1.0),
     A.Affine(
         translate_percent={"x":(-0.10,0.10), "y":(-0.20,0.70)},
@@ -54,6 +62,8 @@ augmentor = A.Compose([
     A.Perspective(scale=(0.01,0.05), p=0.5),
     A.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.15, hue=0.1, p=0.7),
     A.Blur(blur_limit=3, p=0.3),
+    A.MotionBlur(blur_limit=5, p=0.15),
+    A.GaussNoise(var_limit=(10.0, 50.0), p=0.07)
 ], p=1.0)
 
 # ─── WORKER FUNCTION ────────────────────────────────────────────────────────────
