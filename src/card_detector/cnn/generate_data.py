@@ -1,4 +1,4 @@
-"""yolo/generate_data.py
+"""cnn/generate_data.py
 
 Utility script for generating the data used to train the CNN models.
 """
@@ -13,21 +13,23 @@ import albumentations as A
 from concurrent.futures import ProcessPoolExecutor
 import multiprocessing
 
+from card_detector.config import load_config
+
 # ─── CONFIGURATION ─────────────────────────────────────────────────────────────
-BASE_DIR     = os.path.dirname(os.path.abspath(__file__))
-SOURCE_DIR   = os.path.join(BASE_DIR, 'images', 'cards')
-TRAIN_DIR    = os.path.join(BASE_DIR, 'dataset', 'cnn', 'train')
-VAL_DIR      = os.path.join(BASE_DIR, 'dataset', 'cnn', 'val')
-VAL_SPLIT    = 0.2
-VARIANTS_PER = 150
-RANDOM_SEED  = 88
-ALLOWED_EXT  = ('.png', '.jpg', '.jpeg', '.bmp')
+cfg = load_config("datagen.yaml", "cnn")
+
+SOURCE_DIR   = cfg["source_dir"]
+TRAIN_DIR    = cfg["output_train_dir"]
+VAL_DIR      = cfg["output_val_dir"]
+VAL_SPLIT    = cfg["val_split"]
+VARIANTS_PER = cfg["variants_per"]
+RANDOM_SEED  = cfg["random_seed"]
+ALLOWED_EXT  = tuple(cfg["allowed_ext"])
 
 # ─── COMPONENT OVERLAY CONFIG ───────────────────────────────────────────────────
-COMPONENTS_DIR         = os.path.join(BASE_DIR, 'images', 'screenshots', 'backgrounds', 'components')
-COMPONENT_ON_IMAGE_PROB = 0.08             # 8% of variants get a snippet
-COMPONENT_SCALE_RANGE  = (0.25, 0.5)       # snippet size relative to image width
-COMPONENT_AMOUNT       = 1                # how many per decorated image
+COMPONENTS_DIR         = cfg["comp_dir"]
+COMPONENT_ON_IMAGE_PROB = cfg["comp_prob"]             
+COMPONENT_SCALE_RANGE  = (cfg["comp_scale_min"], cfg["comp_scale_max"])
 
 # gather component paths
 component_paths = (
@@ -43,15 +45,25 @@ augmentor = A.Compose([
     A.OneOf([
         A.Resize(224, 224),
         A.RandomResizedCrop(size=(224,224), scale=(0.5,1.0), ratio=(0.8,1.2)),
+        A.Sequential([
+            A.Resize(64, 64),    # Downscale then restore
+            A.Resize(224, 224),
+        ]),
+        A.Sequential([
+            A.Downscale(scale_min=0.25, scale_max=0.5, interpolation=0),  # Albumentations has this!
+            A.Resize(224, 224),
+        ]),
     ], p=1.0),
     A.Affine(
-        translate_percent={"x":(-0.10,0.10), "y":(-0.90,0.90)},
-        p=0.25
+        translate_percent={"x":(-0.10,0.10), "y":(-0.20,0.70)},
+        p=0.5
     ),
     A.Affine(rotate=(-5,5), shear=(-2,2), p=0.8),
     A.Perspective(scale=(0.01,0.05), p=0.5),
     A.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.15, hue=0.1, p=0.7),
     A.Blur(blur_limit=3, p=0.3),
+    A.MotionBlur(blur_limit=5, p=0.15),
+    A.GaussNoise(var_limit=(10.0, 50.0), p=0.07)
 ], p=1.0)
 
 # ─── WORKER FUNCTION ────────────────────────────────────────────────────────────
@@ -82,23 +94,22 @@ def process_image(args):
 
             # 2) optionally overlay component snippet
             if component_paths and random.random() < COMPONENT_ON_IMAGE_PROB:
-                for _ in range(COMPONENT_AMOUNT):
-                    comp_path = random.choice(component_paths)
-                    with Image.open(comp_path).convert('RGBA') as comp:
-                        cw, ch = comp.size
-                        img_w, img_h = working.size
-                        # scale snippet
-                        scale = random.uniform(*COMPONENT_SCALE_RANGE) * img_w / cw
-                        comp_w, comp_h = int(cw*scale), int(ch*scale)
-                        snippet = comp.resize((comp_w, comp_h), Image.LANCZOS)
-                        # skip if too large
-                        if comp_w > img_w or comp_h > img_h:
-                            continue
-                        # random position
-                        max_x, max_y = img_w - comp_w, img_h - comp_h
-                        cx = random.randint(0, max_x)
-                        cy = random.randint(0, max_y)
-                        working.paste(snippet, (cx, cy), snippet)
+                comp_path = random.choice(component_paths)
+                with Image.open(comp_path).convert('RGBA') as comp:
+                    cw, ch = comp.size
+                    img_w, img_h = working.size
+                    # scale snippet
+                    scale = random.uniform(*COMPONENT_SCALE_RANGE) * img_w / cw
+                    comp_w, comp_h = int(cw*scale), int(ch*scale)
+                    snippet = comp.resize((comp_w, comp_h), Image.LANCZOS)
+                    # skip if too large
+                    if comp_w > img_w or comp_h > img_h:
+                        continue
+                    # random position
+                    max_x, max_y = img_w - comp_w, img_h - comp_h
+                    cx = random.randint(0, max_x)
+                    cy = random.randint(0, max_y)
+                    working.paste(snippet, (cx, cy), snippet)
 
             # 3) convert to RGB numpy for augmentation
             working_rgb = working.convert('RGB')
@@ -118,7 +129,7 @@ def process_image(args):
         print(f"[PID {os.getpid()}] ERROR on {img_path}: {e}")
 
 # ─── MAIN EXECUTION ─────────────────────────────────────────────────────────────
-if __name__ == '__main__':
+def main():
     # wipe old outputs
     for d in (TRAIN_DIR, VAL_DIR):
         if os.path.exists(d):

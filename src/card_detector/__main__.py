@@ -50,13 +50,12 @@ def main():
     cnn_parser = train_subparsers.add_parser("cnn", help="Train CNN with distillation")
     cnn_parser.add_argument("--epochs-master", type=int, help="Epochs for master CNN")
     cnn_parser.add_argument("--epochs-student", type=int, help="Epochs for student CNN(s)")
-    cnn_parser.add_argument("--student-only", action="store_true", help="Only train students (skip master)")
-    cnn_parser.add_argument("--resume-master", action="store_true", help="Resume master CNN from checkpoint")
+    cnn_parser.add_argument("--student-only", action="store_true", help="Only train students (skip master)", default=False)
+    cnn_parser.add_argument("--resume-master", action="store_true", help="Resume master CNN from checkpoint", default=False)
 
     args = parser.parse_args()
 
     # ---- Command dispatch ----
-
     if args.command in ("detect", "d", "D"):
         # ---- handle detection pipeline ----
         from card_detector.pipeline.screenshot_pipeline import ScreenshotPipeline
@@ -107,12 +106,13 @@ def main():
                 logger.info(results)
 
     elif args.command in ("train", "t", "T"):
+        logger.setLevel(logging.DEBUG)
         if args.model == "yolo":
             from card_detector.yolo.train import train as train_yolo
             train_yolo(args, logger)
         elif args.model == "cnn":
-            from card_detector.cnn.train import train as train_cnn
-            train_cnn(args)
+            from card_detector.cnn.train import train_cnn
+            train_cnn(args, logger)
         else:
             logger.error("Unknown model for training.")
 

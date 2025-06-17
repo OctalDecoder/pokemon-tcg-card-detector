@@ -1,0 +1,28 @@
+shared:
+  random_seed: 42
+  card_images_dir: "data/raw/cards" # Directory containing labelled cards
+  training_data_dir: "data/"
+  output_dir: "output/"
+
+yolo:
+  data_config: "configs/yolo_training_data.yaml"
+  model_name: "tcgp_card_detector"
+  model: "yolov8n.pt" # Model to use as base. If null defaults to "yolov8n.pt"
+  batch_size: 16
+  epochs: 25
+  img_size: 640
+  device: 0
+  lr0: 0.001
+  lr_final_factor: 0.01
+  patience: 5
+
+cnn:
+  epochs_master: 25
+  epochs_student: 15
+  batch_size: 32
+  weight_decay: 0.02
+  lr_master: 0.0003
+  lr_student: 0.0002
+  t_kd: 4.0
+  alpha_ce: 0.2
+  img_size: 224

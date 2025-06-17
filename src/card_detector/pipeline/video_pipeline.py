@@ -46,7 +46,7 @@ from .screenshot_pipeline import merge_overlapping_boxes
 
 # Module-Level Defaults/Constants
 DEFAULT_CODEC = "mp4v"
-DEFAULT_OUTPUT_SUBDIR = "video_pipeline"
+DEFAULT_OUTPUT_SUBDIR = "video"
 DEFAULT_DISPLAY_FPS = 30
 DEFAULT_QUEUE_MAXSIZE = 1024
 DEFAULT_VIDEO_EXT = "*.mp4"
@@ -236,6 +236,7 @@ class VideoPipeline:
 
                     # State reset
                     self.seen_cards.clear()
+                    self.crop_phash_buffer.clear()
                     self.frame_idx = 0
 
                     # Video Processing Loop
@@ -357,6 +358,11 @@ class VideoPipeline:
                     elif not self.seen_cards and self.debug:
                         if self.logger:
                             self.logger.info(f"\n==> No cards detected in '{vp.name}'.")
+                         
+                    # Ensure queue is cleared before adding to results
+                    while not self.detection_queue.empty():
+                        time.sleep(0.05)
+                    time.sleep(0.1) # Additional processing time for cleanup (not needed but safer)
                     
                     self.all_video_detections[vp.name] = set(self.seen_cards)
 
@@ -391,11 +397,17 @@ class VideoPipeline:
                     cv2.destroyAllWindows()
                 except Exception:
                     pass
+        
+        if not videos or len(videos) < 1:
+            if self.logger:
+                self.logger.warning(f"No videos found at: {Path(video_dir)}")
+            return self.all_video_detections
 
         self.total_time = time.time() - all_start
         
         # Log metrics and return results
-        print_section_header("Metrics")
-        print_video_pipeline_metrics(self)
+        if logging:
+            print_section_header("Metrics")
+            print_video_pipeline_metrics(self)
         return self.all_video_detections
 
