@@ -18,3 +18,18 @@ tests:
   - video: "test_5.mp4"
     fixture: "test_5.yaml"
     min_accuracy: 1.0
+  - video: "test_1_lowres.mp4"
+    fixture: "test_1_lowres.yaml"
+    min_accuracy: 1.0
+  - video: "test_2_lowres.mp4"
+    fixture: "test_2_lowres.yaml"
+    min_accuracy: 1.0
+  - video: "test_3_lowres.mp4"
+    fixture: "test_3_lowres.yaml"
+    min_accuracy: 1.0
+  - video: "test_4_lowres.mp4"
+    fixture: "test_4_lowres.yaml"
+    min_accuracy: 1.0
+  - video: "test_5_lowres.mp4"
+    fixture: "test_5_lowres.yaml"
+    min_accuracy: 1.0
