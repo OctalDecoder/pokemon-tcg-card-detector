@@ -1,0 +1,52 @@
+# --------- SHARED ---------------------------------------------------------------------------------------
+shared:
+  # Detection
+  screenshot_dir: "data/fixtures" # Directory containing screenshots to process
+  video_dir: "data/videos" # Directory containing videos to process
+
+  # Models
+  classifiers: ["fullart", "standard"]
+  yolo_model: "models/yolo_card_detector.pt"
+  cnn_model_dir: "models/"
+
+  # General
+  debug: false
+  database: "models/cards.db"
+
+# --------- SCREENSHOT DETECTOR --------------------------------------------------------------------------
+screenshot_pipeline:
+  use_master_cnn: false # If true, distilled student CNNs are ignored
+  yolo_conf_thresh: 0.1
+  cnn_conf_thresh: 0.15
+
+  # Results
+  save_results: true
+  grid_cols: 5
+  middle_space: 20
+
+# --------- VIDEO DETECTOR -----------------------------------------------------
+video_pipeline:
+  yolo_conf_thresh: 0.5
+  cnn_conf_thresh: 0.5
+  bbox_iou_thresh: 0.3
+  cnn_batch_size: 5
+
+  # Performance tuning
+  phashing_enabled: true # Hash detections to ignore duplicates, more cpu load, less gpu, less time
+  phash_hamming_distance: 3
+  turbo: false # Only processes frames that run detection. Faster with > detection_skip.
+  detection_skip: 4 # Saves CPU significantly - skips detection on frames
+  classification_skip: 0 # How many deteciton frames to skip, better to tune detection_skip
+  detection_queue_maxsize: 256 # Backlog of detections, if over this number, don't process detections
+
+  # Display and Render
+  display_video: true
+  display_fps: null # null to use native fps. Upper bound live display FPS (turbo overrides this)
+
+  record_video: true
+  recording_fps: null # null to use videos original fps (turbo overrides this)
+
+  show_fps: true
+  show_bboxes: true
+  show_classifications: true
+  classification_timer: 2

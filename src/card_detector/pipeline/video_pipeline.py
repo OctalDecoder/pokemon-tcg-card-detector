@@ -46,7 +46,7 @@ from .screenshot_pipeline import merge_overlapping_boxes
 
 # Module-Level Defaults/Constants
 DEFAULT_CODEC = "mp4v"
-DEFAULT_OUTPUT_SUBDIR = "video_pipeline"
+DEFAULT_OUTPUT_SUBDIR = "video"
 DEFAULT_DISPLAY_FPS = 30
 DEFAULT_QUEUE_MAXSIZE = 1024
 DEFAULT_VIDEO_EXT = "*.mp4"
@@ -391,6 +391,11 @@ class VideoPipeline:
                     cv2.destroyAllWindows()
                 except Exception:
                     pass
+        
+        if not videos or len(videos) < 1:
+            if self.logger:
+                self.logger.warning(f"No videos found at: {Path(video_dir)}")
+            return self.all_video_detections
 
         self.total_time = time.time() - all_start
         

@@ -1,0 +1,26 @@
+# Data Generation Configuration
+shared:
+  source_dir: "data/data_gen/cards"
+  allowed_ext: [".png", ".jpg", ".jpeg"]
+
+  # Components (Scroll Icons, Overlay Items, Obstructing Obejcts etc.)
+  comp_dir: "data/data_gen/backgrounds/components"
+  comp_prob: 0.08 # Probablity component shows over a card
+  comp_scale_min: 0.25
+  comp_scale_max: 0.8
+
+yolo:
+  background_dir: "images/backgrounds"
+  output_img_dir: "data/yolo/images/train"
+  output_label_dir: "data/yolo/labels/train"
+
+  variants_per: 100
+  val_split: 0.2
+
+cnn:
+  random_seed: 132
+  output_train_dir: "data/cnn/train"
+  output_val_dir: "data/cnn/val"
+
+  variants_per: 120
+  val_split: 0.2

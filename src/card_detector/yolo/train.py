@@ -3,8 +3,6 @@
 Training script for a YOLOv8 nano model
 """
 
-
-
 def train(args, logger):
     """
     Train a YOLOv8 model, using either config or CLI overrides.
@@ -14,9 +12,9 @@ def train(args, logger):
     import shutil
     from ultralytics import YOLO
     
-    from card_detector.config import cfg
+    from card_detector.config import load_config
 
-    ycfg: dict = cfg["yolo"].copy()
+    ycfg: dict = load_config("training.yaml", "yolo")
 
     # Override YAML with CLI if specified
     if args.epochs is not None:      ycfg["epochs"]      = args.epochs

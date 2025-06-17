@@ -1,11 +1,11 @@
 data/
 output/
 card_detector.egg-info/
-tests/fixtures
-tests/videos
 
 __pycache__/
 *.pyc
+
+.pytest_cache/
 
 .vscode/
 
