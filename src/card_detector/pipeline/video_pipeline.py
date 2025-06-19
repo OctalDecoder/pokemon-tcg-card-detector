@@ -49,7 +49,7 @@ DEFAULT_CODEC = "mp4v"
 DEFAULT_OUTPUT_SUBDIR = "video"
 DEFAULT_DISPLAY_FPS = 30
 DEFAULT_QUEUE_MAXSIZE = 1024
-DEFAULT_VIDEO_EXT = "*.mp4"
+DEFAULT_VIDEO_EXTS = ("*.mp4", "*.mov")
 DEFAULT_FPS_WINDOW = 30
 
 class VideoPipeline:
@@ -134,7 +134,7 @@ class VideoPipeline:
         # Perceptual Hashing
         self.phashing_enabled = pcfg.get("phashing_enabled", False)
         self.phash_hamming_thresh =  pcfg.get("phash_hamming_distance", 5)
-        self.crop_phash_buffer = deque(maxlen=30)  # Perceptual Hashing
+        self.crop_phash_buffer = deque(maxlen=50)  # Perceptual Hashing
 
         # Overlay/Display state
         self._fps_times: List[float] = []
@@ -197,7 +197,9 @@ class VideoPipeline:
             self.logger.info("Starting video pipeline...")
 
         video_dir = video_dir or self.pcfg["video_dir"]
-        videos = sorted(Path(video_dir).glob(DEFAULT_VIDEO_EXT))
+        videos = []
+        for ext in DEFAULT_VIDEO_EXTS:
+            videos.extend(sorted(Path(video_dir).glob(ext)))
 
         all_start = time.time()
         worker = threading.Thread(target=self._worker_loop, daemon=True)
