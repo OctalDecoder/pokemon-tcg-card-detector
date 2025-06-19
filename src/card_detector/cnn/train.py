@@ -15,10 +15,6 @@ from torch import nn, optim
 from torch.utils.data import DataLoader, Dataset
 import torchvision as tv
 from torchvision import transforms
-from torchvision.models import (
-    efficientnet_b0, EfficientNet_B0_Weights,
-    mobilenet_v3_small, MobileNet_V3_Small_Weights,
-)
 
 from card_detector.config import load_config
 
@@ -269,6 +265,7 @@ def train_master(epochs: int, device: str, resume_master: bool = False, logger=N
     Train the master EfficientNet-B0 model on all training categories combined.
     Returns the best validation accuracy achieved.
     """
+    from torchvision.models import efficientnet_b0, EfficientNet_B0_Weights
     # Prepare combined dataset from all category subfolders
     master_train_dirs = [TRAIN_DIR / cat for cat in list_subcategories(TRAIN_DIR)]
     master_val_dirs   = [VAL_DIR / cat for cat in list_subcategories(VAL_DIR)]
@@ -338,38 +335,92 @@ def train_master(epochs: int, device: str, resume_master: bool = False, logger=N
 def distil_student(category: str, teacher_ckpt: Path, epochs: int, device: str, logger=None) -> float:
     """
     Train (distill) a MobileNetV3-Small student model for the given category,
-    using the master model (EfficientNet-B0) as teacher.
+    using the master model (EfficientNet-B0) as teacher, with Quantization-Aware Training (QAT).
     Returns the best validation accuracy for this student.
     """
+    import torch
+    import torch.nn as nn
+    import torch.optim as optim
+    from torchvision.models import mobilenet_v3_small, MobileNet_V3_Small_Weights, efficientnet_b0
+    
     train_path = TRAIN_DIR / category
     val_path   = VAL_DIR / category
 
     # Build DataLoaders for this category
     train_loader, val_loader, num_classes = build_loaders(train_path, val_path)
-    # Save class-to-card mappings for this student's classes
     train_dataset = train_loader.dataset  # ImageFolder dataset
     save_student_mapping(category, train_dataset.class_to_idx)
 
-    # Load teacher model (EfficientNet-B0) and adapt to this category's classes
-    teacher = efficientnet_b0(weights=None)  # initialize without pre-trained weights for safety
+    # Load teacher model
+    teacher = efficientnet_b0(weights=None)
     in_features_t = teacher.classifier[1].in_features
     teacher.classifier[1] = nn.Linear(in_features_t, num_classes)
-    # Load the master model weights (except final layer) into teacher model
     try:
         teacher_ckpt_data = torch.load(teacher_ckpt, map_location=device)
     except FileNotFoundError:
         logger.error(f"Failed to load teacher model. File not found: {teacher_ckpt}")
         return 0
-    # Remove any classifier weights from checkpoint to avoid size mismatch
     teacher_ckpt_data.pop("classifier.1.weight", None)
     teacher_ckpt_data.pop("classifier.1.bias", None)
     teacher.load_state_dict(teacher_ckpt_data, strict=False)
     teacher.eval().to(device)
 
-    # Initialize student MobileNetV3-Small model with ImageNet weights, replace classifier head
+    # ---- QAT Student Preparation ---- #
     student = mobilenet_v3_small(weights=MobileNet_V3_Small_Weights.IMAGENET1K_V1)
     in_features_s = student.classifier[3].in_features
     student.classifier[3] = nn.Linear(in_features_s, num_classes)
+    student.eval()
+
+    # 1. Set the quantization config (QAT)
+    student.qconfig = torch.quantization.get_default_qat_qconfig('fbgemm')  # Use 'qnnpack' for ARM/mobile
+
+    # 2. Fuse eligible modules (required for QAT to work well)
+    import torch.nn as nn
+    # Fuse stem if activation is ReLU
+    stem = student.features[0]
+    if (
+        isinstance(stem[0], nn.Conv2d) and
+        isinstance(stem[1], nn.BatchNorm2d) and
+        isinstance(stem[2], nn.ReLU)
+    ):
+        torch.quantization.fuse_modules(stem, ['0', '1', '2'], inplace=True)
+    elif (
+        isinstance(stem[0], nn.Conv2d) and
+        isinstance(stem[1], nn.BatchNorm2d) and
+        isinstance(stem[2], nn.Hardswish)
+    ):
+        torch.quantization.fuse_modules(stem, ['0', '1'], inplace=True)
+
+    # For each InvertedResidual block, fuse as appropriate
+    for m in student.features:
+        if type(m).__name__ == "InvertedResidual" and hasattr(m, 'conv'):
+            # Conv-BN-ReLU
+            if (
+                len(m.conv) >= 3 and
+                isinstance(m.conv[0], nn.Conv2d) and
+                isinstance(m.conv[1], nn.BatchNorm2d) and
+                isinstance(m.conv[2], nn.ReLU)
+            ):
+                torch.quantization.fuse_modules(m.conv, ['0', '1', '2'], inplace=True)
+            # Conv-BN-Hardswish (can't fuse the activation)
+            elif (
+                len(m.conv) >= 3 and
+                isinstance(m.conv[0], nn.Conv2d) and
+                isinstance(m.conv[1], nn.BatchNorm2d) and
+                isinstance(m.conv[2], nn.Hardswish)
+            ):
+                torch.quantization.fuse_modules(m.conv, ['0', '1'], inplace=True)
+            # Conv-BN only
+            elif (
+                len(m.conv) >= 2 and
+                isinstance(m.conv[0], nn.Conv2d) and
+                isinstance(m.conv[1], nn.BatchNorm2d)
+            ):
+                torch.quantization.fuse_modules(m.conv, ['0', '1'], inplace=True)
+
+    # 3. Prepare for QAT
+    student.train()
+    torch.quantization.prepare_qat(student, inplace=True)
     student.to(device)
 
     # Set up distillation loss, optimizer, and scheduler
@@ -378,45 +429,58 @@ def distil_student(category: str, teacher_ckpt: Path, epochs: int, device: str, 
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
 
     best_val_acc = 0.0
-    student_ckpt = OUTPUT_DIR / f"cnn_{category}_student.pth"
+    student_ckpt = OUTPUT_DIR / f"cnn_{category}_student_qat.pth"
 
-    # Distillation training loop
     try:
         history = {'train_loss': [], 'train_acc': [], 'val_loss': [], 'val_acc': []}
         for ep in range(1, epochs + 1):
-            train_loss, train_acc = run_epoch(student, train_loader, criterion, optimizer,
-                                            distill=True, teacher=teacher, device=device)
-            val_loss, val_acc = run_epoch(student, val_loader, criterion,
-                                        distill=True, teacher=teacher, device=device)
+            # --- After N epochs, switch to eval mode for QAT calibration ---
+            if ep == int(epochs * 0.75):
+                logger.info(f"Disabling quantization observers at epoch {ep} to fix quantization ranges (QAT step).")
+                student.apply(torch.quantization.disable_observer)
+            if ep == int(epochs * 0.90):
+                logger.info(f"Freezing BatchNorm stats at epoch {ep} for final QAT fine-tuning.")
+                student.apply(torch.nn.intrinsic.qat.freeze_bn_stats)
+
+            train_loss, train_acc = run_epoch(
+                student, train_loader, criterion, optimizer,
+                distill=True, teacher=teacher, device=device
+            )
+            val_loss, val_acc = run_epoch(
+                student, val_loader, criterion,
+                distill=True, teacher=teacher, device=device
+            )
             scheduler.step()
-            
-            # Record metrics
             history['train_loss'].append(train_loss)
             history['train_acc'].append(train_acc)
             history['val_loss'].append(val_loss)
             history['val_acc'].append(val_acc)
-
-            # Log epoch results for this student
-            msg = (f"[Student-{category} {ep}/{epochs}] "
+            msg = (f"[Student-QAT-{category} {ep}/{epochs}] "
                 f"train_loss: {train_loss:.4f}, train_acc: {train_acc:.3f} | "
                 f"val_loss: {val_loss:.4f}, val_acc: {val_acc:.3f}")
             logger.info(msg) if logger else print(msg)
-
-            # Check for new best validation accuracy
             if val_acc > best_val_acc:
                 best_val_acc = val_acc
                 torch.save(student.state_dict(), student_ckpt)
                 msg_best = "    ↳ best saved"
-                logger.info(msg_best) if logger else print(msg_best)\
-    
+                logger.info(msg_best) if logger else print(msg_best)
     except KeyboardInterrupt:
         logger.warning(f"Distillation for {category} interrupted by user (KeyboardInterrupt). Saving progress and exiting.")
 
-    # Finalize student training for this category
+    # --- Quantize model after QAT (for deployment) ---
+    # Load best model checkpoint
+    student.load_state_dict(torch.load(student_ckpt, map_location='cpu'))
+    student.eval()
+    quantized_model = torch.quantization.convert(student.cpu().eval(), inplace=False)
+    # Save final quantized model (entire model object for PyTorch Mobile)
+    torch.save(quantized_model, OUTPUT_DIR / f"cnn_{category}_student_qat_int8_full.pth")
+
+    # Finalize
     show_training_curves(history)
-    final_msg = f"Finished distilling '{category}' - best val accuracy: {best_val_acc:.3f}"
+    final_msg = f"Finished QAT distilling '{category}' - best val accuracy: {best_val_acc:.3f}"
     logger.info(final_msg) if logger else print(final_msg)
     return best_val_acc
+
 
 # ─────────────── Main Training Function ───────────────
 
@@ -428,6 +492,7 @@ def train_cnn(args, logger=None):
 
     epochs_master = args.epochs_master if args.epochs_master is not None else CONFIG["epochs_master"]
     epochs_student = args.epochs_student if args.epochs_student is not None else CONFIG["epochs_student"]
+    
     # Train master model if required
     if not args.student_only:
         logger.info("Training master model...") if logger else print("Training master model...")
