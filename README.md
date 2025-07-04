@@ -10,7 +10,11 @@
 ## 🚀 Project Summary
 
 This repository implements a **high-performance Pokemon TCG Pocket card detection and classification pipeline** for real-time screenshot and video input.
-The workflow is fully asynchronous and optimized for speed, accuracy, and scalability.
+The workflow is fully asynchronous and optimized for speed, accuracy, and scalability. Below is a video of the application providing real time detections to the top right of screen.
+
+<img src="assets/dex_scrolling.gif" width="300">
+
+_Example: Dex Scrolling Video Demo_
 
 > _Future plans to expand to the full **Pokemon TCG**._
 
@@ -39,10 +43,6 @@ _Example: Pack Opening Video Demo_
 <img src="assets/3.png" width="800">
 
 _Example: Pack Summary Screenshot_
-
-<img src="assets/dex_scrolling.gif" width="220">
-
-_Example: Dex Scrolling Video Demo_
 
 ---
 
